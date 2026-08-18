@@ -210,13 +210,15 @@ function migratePaymentsAddCustomerColumns() {
 }
 
 /**
- * migrateOrderItemsAddCategoryAndOrderNo — เติมคอลัมน์ category_id (ผูกจาก product_id ไปยัง
- * Products.category_id) และ order_no (ผูกจาก order_id ไปยัง Orders/Orders_Archive.order_no) ให้ชีต
- * OrderItems สำหรับแถวเก่าที่สั่งซื้อไปแล้วก่อนเพิ่ม field เหล่านี้ในโค้ด (สินค้า/ออเดอร์ที่ถูกลบไปแล้ว
- * จะไม่มีข้อมูลย้อนหลังให้ เพราะไม่มีต้นทางให้ join) — ต้องรันหลัง repairSchema ครั้งเดียว
- * (ปลอดภัย รันซ้ำได้เสมอ) วิธีใช้: เลือกฟังก์ชัน migrateOrderItemsAddCategoryAndOrderNo แล้วกด Run
+ * migrateOrderItemsBackfillFields — จัดคอลัมน์ชีต OrderItems ใหม่ให้ตรงกับ SHEET_SCHEMAS ปัจจุบัน (sku ตาม
+ * ด้วย customer_name, user_id, phone, category_id ก่อน product_name) พร้อมเติมย้อนหลังให้แถวเก่าที่ยังไม่มี
+ * ข้อมูลพวกนี้ — category_id ผูกจาก product_id ไปยัง Products.category_id, ที่เหลือ (order_no, customer_name,
+ * user_id, phone) ผูกจาก order_id ไปยัง Orders/Orders_Archive (สินค้า/ออเดอร์ที่ถูกลบไปแล้วจะไม่มีข้อมูล
+ * ย้อนหลังให้ เพราะไม่มีต้นทางให้ join) — แทนที่ migrateOrderItemsAddCategory/migrateOrderItemsAddCategoryAndOrderNo
+ * รุ่นก่อนหน้าไปเลย (รันตัวนี้แทนได้ทันที ไม่ต้องรันตัวเก่าก่อน ปลอดภัย รันซ้ำได้เสมอ)
+ * ต้องรันหลัง repairSchema ครั้งเดียว วิธีใช้: เลือกฟังก์ชัน migrateOrderItemsBackfillFields แล้วกด Run
  */
-function migrateOrderItemsAddCategoryAndOrderNo() {
+function migrateOrderItemsBackfillFields() {
   var ss = getSpreadsheet();
   var sh = ss.getSheetByName('OrderItems');
   if (!sh) return ok({ migrated: 0 }, 'ยังไม่มีชีต OrderItems');
@@ -229,17 +231,24 @@ function migrateOrderItemsAddCategoryAndOrderNo() {
 
   var rows = findAll('OrderItems', null, true);
   var headers = SHEET_SCHEMAS.OrderItems;
-  var filledCategory = 0, filledOrderNo = 0;
+  var filledCategory = 0, filledOrderNo = 0, filledCustomer = 0;
   var matrix = rows.map(function (i) {
     var product = productById_[i.product_id];
     var order = orderById_[i.order_id];
     var categoryId = i.category_id || (product ? product.category_id : '') || '';
     var orderNo = i.order_no || (order ? order.order_no : '') || '';
+    var customerName = i.customer_name || (order ? order.customer_name : '') || '';
+    var userId = i.user_id || (order ? order.user_id : '') || '';
+    var phone = i.phone || (order ? normalizePhone_(order.phone) : '') || '';
     if (categoryId && !i.category_id) filledCategory++;
     if (orderNo && !i.order_no) filledOrderNo++;
+    if (customerName && !i.customer_name) filledCustomer++;
     return headers.map(function (h) {
       if (h === 'category_id') return categoryId;
       if (h === 'order_no') return orderNo;
+      if (h === 'customer_name') return customerName;
+      if (h === 'user_id') return userId;
+      if (h === 'phone') return phone;
       return i[h] !== undefined ? i[h] : '';
     });
   });
@@ -250,8 +259,8 @@ function migrateOrderItemsAddCategoryAndOrderNo() {
   sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#1f2937').setFontColor('#ffffff');
   if (matrix.length) sh.getRange(2, 1, matrix.length, headers.length).setValues(matrix);
   invalidateCache('OrderItems');
-  return ok({ migrated: matrix.length, filled_category: filledCategory, filled_order_no: filledOrderNo },
-    'เติม category_id/order_no ให้ OrderItems แล้ว (category_id: ' + filledCategory + ', order_no: ' + filledOrderNo + ' จากทั้งหมด ' + matrix.length + ' แถว)');
+  return ok({ migrated: matrix.length, filled_category: filledCategory, filled_order_no: filledOrderNo, filled_customer: filledCustomer },
+    'จัดคอลัมน์ OrderItems ใหม่ + เติมข้อมูลย้อนหลังแล้ว (category_id: ' + filledCategory + ', order_no: ' + filledOrderNo + ', ลูกค้า: ' + filledCustomer + ' จากทั้งหมด ' + matrix.length + ' แถว)');
 }
 
 /**

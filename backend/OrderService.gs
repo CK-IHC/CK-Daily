@@ -81,7 +81,8 @@ function orderCreate(payload, token) {
 
     var itemRows = totals.items.map(function (i) {
       return {
-        item_id: genId('ITM'), order_id: order.order_id, order_no: order.order_no, product_id: i.product_id, category_id: i.category_id || '', sku: i.sku || '', product_name: i.product_name,
+        item_id: genId('ITM'), order_id: order.order_id, order_no: order.order_no, product_id: i.product_id, sku: i.sku || '',
+        customer_name: order.customer_name, user_id: order.user_id, phone: order.phone, category_id: i.category_id || '', product_name: i.product_name,
         options_json: i.options_json, unit_price: i.unit_price, qty: i.qty, line_total: i.line_total, note: i.note
       };
     });
@@ -464,7 +465,8 @@ function adminOrderItemsExport(payload, token) {
     .sort(function (a, b) { return toDate(b.created_at) - toDate(a.created_at); });
   return ok(items.map(function (i) {
     return {
-      order_no: i.order_no || '', order_id: i.order_id, category_id: i.category_id || '', sku: i.sku || '',
+      order_no: i.order_no || '', order_id: i.order_id, sku: i.sku || '',
+      customer_name: i.customer_name || '', user_id: i.user_id || '', phone: i.phone || '', category_id: i.category_id || '',
       product_name: i.product_name, qty: numFrom(i.qty), unit_price: numFrom(i.unit_price), line_total: numFrom(i.line_total),
       note: i.note || '', created_at: i.created_at
     };
