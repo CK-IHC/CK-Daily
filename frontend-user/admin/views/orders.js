@@ -272,7 +272,7 @@ function printOrdersReport(items, total) {
   }).join('');
   var sum = items.reduce(function (s, o) { return s + Number(o.grand_total || 0); }, 0);
   var html = '<!DOCTYPE html><html><head><title>รายงานออเดอร์</title><meta charset="utf-8">' +
-    '<style>@page{size:A4;margin:14mm 12mm 26mm 12mm}' +
+    '<style>@page{margin:14mm 12mm 26mm 12mm}' +
     'body{font-family:Arial,sans-serif;padding:24px 24px 46px;color:#000}' +
     '.print-doc-brand{line-height:1.3}.print-doc-brand b{font-size:17px}.print-doc-brand span{display:block;font-size:11px;color:#555}' +
     '.print-doc-title{font-size:20px;margin:10px 0 4px}' +
@@ -486,7 +486,7 @@ Views.orders = function (container) {
     if (!lastData) return;
     // พิมพ์ตามแท็บที่กำลังเปิดดูอยู่จริง ไม่ใช่ข้อมูลค้างจากแท็บอื่นที่เคยโหลดไว้ก่อนหน้า
     if (tab === 'list') { printOrdersReport(lastData.items, lastData.total); return; }
-    var titles = { detail: 'รายละเอียดออเดอร์ (จัดกลุ่มตามเบอร์โทร)', summary: 'สรุปยอดขาย' };
+    var titles = { detail: 'รายละเอียดออเดอร์', summary: 'สรุปยอดขาย' };
     UI.printWithHeader(titles[tab] || 'รายงานออเดอร์', document.getElementById('tableArea'));
   };
   document.getElementById('btnScan').onclick = function () {
@@ -581,7 +581,7 @@ Views.orders = function (container) {
     });
     el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>เบอร์</th><th>ยอด</th><th>ชำระเงิน</th><th>สถานะ</th><th>เวลา</th><th>หมายเหตุ</th><th>รายการสั่งซื้อ</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
       bodyHtml + '</tbody></table></div>' +
-      '<div style="margin-top:10px;font-size:12px;color:var(--text-muted)">ทั้งหมด ' + data.total + ' รายการ (จัดกลุ่มตามเบอร์โทร)</div>';
+      '<div style="margin-top:10px;font-size:12px;color:var(--text-muted)">ทั้งหมด ' + data.total + ' รายการ</div>';
     el.querySelectorAll('.detailLink').forEach(function (b) { b.onclick = function () { openOrderDetailModal(b.dataset.id, load); }; });
     el.querySelectorAll('.manageBtn').forEach(function (b) { b.onclick = function () { openOrderDetailModal(b.dataset.id, load); }; });
   }
@@ -589,25 +589,8 @@ Views.orders = function (container) {
   function renderSummary(data) {
     var el = document.getElementById('tableArea');
     if (!el) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
-    var att = data.attachments_summary || { with_photo: 0, without_photo: 0, with_slip: 0, without_slip: 0, orders: [] };
     el.innerHTML = '<div class="kpi-grid"><div class="kpi-card"><div class="label">จำนวนออเดอร์</div><div class="value">' + data.order_count + '</div></div>' +
       '<div class="kpi-card"><div class="label">ยอดขายรวม</div><div class="value">' + UI.money(data.total_amount) + '</div></div></div>' +
-      '<div class="card"><div class="card-head"><h3>สรุปรูปแนบออเดอร์/สลิปโอนเงิน</h3><button class="btn btn-sm btn-outline no-print" id="expAttachments">Export Excel (CSV)</button></div>' +
-        '<div class="kpi-grid">' +
-          '<div class="kpi-card"><div class="label">แนบรูปออเดอร์แล้ว</div><div class="value">' + att.with_photo + '/' + data.order_count + '</div></div>' +
-          '<div class="kpi-card"><div class="label">ยังไม่แนบรูปออเดอร์</div><div class="value">' + att.without_photo + '/' + data.order_count + '</div></div>' +
-          '<div class="kpi-card"><div class="label">แนบสลิปโอนเงินแล้ว</div><div class="value">' + att.with_slip + '/' + data.order_count + '</div></div>' +
-          '<div class="kpi-card"><div class="label">ยังไม่แนบสลิปโอนเงิน</div><div class="value">' + att.without_slip + '/' + data.order_count + '</div></div>' +
-        '</div>' +
-        (att.orders.length
-          ? '<div class="table-wrap"><table><thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>เบอร์</th><th>เวลา</th><th>รูปออเดอร์</th><th>สลิปโอนเงิน</th></tr></thead><tbody>' +
-            att.orders.map(function (o) {
-              return '<tr><td>#' + UI.escapeHtml(o.order_no) + '</td><td>' + UI.escapeHtml(o.customer_name) + '</td><td>' + o.phone + '</td><td>' + UI.fmtTime(o.placed_at) + '</td>' +
-                '<td>' + (o.has_photo ? '✅ มี' : '❌ ไม่มี') + '</td><td>' + (o.has_slip ? '✅ มี (' + o.slip_count + ' ใบ)' : '❌ ไม่มี') + '</td></tr>';
-            }).join('') +
-            '</tbody></table></div>'
-          : '<div class="empty-state">ไม่มีข้อมูลตามตัวกรองนี้</div>') +
-      '</div>' +
       (data.by_product.length
         ? '<div class="table-wrap"><table><thead><tr><th>รหัส SKU</th><th>สินค้า</th><th>จำนวน</th><th>คงเหลือในสต็อก</th><th>ยอดเงิน</th></tr></thead><tbody>' +
           data.by_product.map(function (p) {
@@ -616,15 +599,6 @@ Views.orders = function (container) {
           }).join('') +
           '</tbody></table></div>'
         : '<div class="empty-state">ไม่มีข้อมูลตามตัวกรองนี้</div>');
-    var expBtn = document.getElementById('expAttachments');
-    if (expBtn) expBtn.onclick = function () {
-      UI.exportCsv('order-attachments-summary.csv', att.orders.map(function (o) {
-        return {
-          order_no: o.order_no, customer_name: o.customer_name, phone: o.phone, placed_at: o.placed_at,
-          has_photo: o.has_photo ? 'มี' : 'ไม่มี', has_slip: o.has_slip ? 'มี' : 'ไม่มี', slip_count: o.slip_count
-        };
-      }));
-    };
   }
 
   function renderTable(data) {

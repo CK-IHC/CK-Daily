@@ -118,7 +118,7 @@ function printOrderHistoryReport_(items, tabLabel) {
   var custName = (State.user && State.user.name) || '';
   var custPhone = (State.user && State.user.phone) || '';
   var html = '<!DOCTYPE html><html><head><title>ประวัติการสั่งซื้อ</title><meta charset="utf-8">' +
-    '<style>@page{size:A4;margin:14mm 12mm 26mm 12mm}' +
+    '<style>@page{margin:14mm 12mm 26mm 12mm}' +
     'body{font-family:Arial,sans-serif;padding:24px 24px 46px;color:#000}' +
     '.print-doc-brand{line-height:1.3}.print-doc-brand b{font-size:17px}.print-doc-brand span{display:block;font-size:11px;color:#555}' +
     '.print-doc-title{font-size:20px;margin:10px 0 4px}' +

@@ -132,8 +132,9 @@ tr:hover td { background: var(--bg); }
 
 @media print {
   /* เว้นระยะขอบล่างของหน้ากระดาษให้กว้างพอสำหรับ footer เสมอ กัน footer (fixed) ทับเนื้อหาแถวสุดท้ายของตาราง
-     ที่ไหลข้ามหลายหน้า — เนื้อหาจะหยุดที่ขอบ margin-bottom นี้เสมอ ไม่มีทางไหลไปชนบริเวณที่ footer วางอยู่ */
-  @page { size: A4; margin: 15mm 12mm 26mm 12mm; }
+     ที่ไหลข้ามหลายหน้า — เนื้อหาจะหยุดที่ขอบ margin-bottom นี้เสมอ ไม่มีทางไหลไปชนบริเวณที่ footer วางอยู่
+     ไม่ fix size (แนวตั้ง/แนวนอน) ปล่อยให้ผู้ใช้เลือกเองได้จาก print dialog ของเบราว์เซอร์ */
+  @page { margin: 15mm 12mm 26mm 12mm; }
   /* พิมพ์เฉพาะเนื้อหาที่ UI.printWithHeader โคลนมาใส่ #printScopeContainer เท่านั้น ไม่พิมพ์ส่วนอื่นของหน้า */
   body > *:not(#printScopeContainer) { display: none !important; }
   body { background: #fff; }

@@ -443,32 +443,12 @@ function adminOrdersSummary(payload, token) {
     g.amount += numFrom(i.line_total);
   });
   var totalAmount = orders.reduce(function (s, o) { return s + numFrom(o.grand_total); }, 0);
-
-  // สรุปการแนบรูปออเดอร์/สลิปโอนเงิน (ใช้ตัวกรองเดียวกับด้านบน) — สำหรับการ์ดสรุปรูปแนบในแท็บ "สรุปยอด"
-  var withPhoto = 0, withSlip = 0;
-  var attachmentRows = orders.map(function (o) {
-    var slipUrls = parseSlipUrls_(o);
-    var hasPhoto = !!o.photo_url;
-    var hasSlip = slipUrls.length > 0;
-    if (hasPhoto) withPhoto++;
-    if (hasSlip) withSlip++;
-    return {
-      order_id: o.order_id, order_no: o.order_no, customer_name: o.customer_name, phone: normalizePhone_(o.phone),
-      placed_at: o.placed_at, has_photo: hasPhoto, photo_url: o.photo_url || '', slip_count: slipUrls.length, has_slip: hasSlip
-    };
-  }).sort(function (a, b) { return toDate(b.placed_at) - toDate(a.placed_at); });
-
   return ok({
     order_count: orders.length,
     total_amount: round2(totalAmount),
     by_product: Object.keys(byProduct).map(function (k) { return byProduct[k]; })
       .map(function (g) { g.amount = round2(g.amount); return g; })
-      .sort(function (a, b) { return b.qty - a.qty; }),
-    attachments_summary: {
-      with_photo: withPhoto, without_photo: orders.length - withPhoto,
-      with_slip: withSlip, without_slip: orders.length - withSlip,
-      orders: attachmentRows
-    }
+      .sort(function (a, b) { return b.qty - a.qty; })
   });
 }
 
