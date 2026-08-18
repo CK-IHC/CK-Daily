@@ -14,6 +14,7 @@ function setupDatabase() {
     sh.getRange(1, 1, 1, headers.length).setValues([headers]);
     sh.setFrozenRows(1);
     sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#1f2937').setFontColor('#ffffff');
+    formatPhoneColumnAsText_(sh, headers); // กันเบอร์โทรถูกตัดเลข 0 นำหน้า/แปลงเป็น scientific notation ตั้งแต่ตอนสร้างชีตใหม่
   });
 
   // ลบชีตเริ่มต้น "Sheet1" ถ้ายังไม่ถูกใช้งานเป็นหนึ่งใน 15 ตาราง
@@ -135,7 +136,21 @@ function migrateOrderStatuses() {
 }
 
 /**
- * repairSchema — เติมคอลัมน์ที่ขาดไปให้ Sheet ที่มีข้อมูลอยู่แล้ว (ไม่ลบ/ไม่ย้ายข้อมูลเดิม)
+ * ตั้งรูปแบบเซลล์คอลัมน์ "phone" ทั้งคอลัมน์ (ทุกแถวที่มีอยู่ในชีตตอนนี้) ให้เป็น Plain text เสมอ — กัน Google
+ * Sheets ตัดเลข 0 นำหน้าทิ้งหรือแปลงเบอร์โทรเป็น scientific notation เวลาข้อมูลดูเป็นตัวเลขล้วน (เช่น
+ * "0891234567") ปลอดภัย รันซ้ำได้เสมอ — ถ้าชีตขยายแถวเกินตอนนี้ในอนาคต รัน repairSchema ซ้ำอีกครั้งจะครอบคลุม
+ * แถวใหม่ที่เพิ่มมาด้วย (เพราะ getMaxRows() จะโตตามจำนวนแถวจริงของชีต ณ ตอนนั้น)
+ */
+function formatPhoneColumnAsText_(sh, headers) {
+  var col = headers.indexOf('phone') + 1;
+  var rows = sh.getMaxRows() - 1;
+  if (col < 1 || rows < 1) return;
+  sh.getRange(2, col, rows, 1).setNumberFormat('@');
+}
+
+/**
+ * repairSchema — เติมคอลัมน์ที่ขาดไปให้ Sheet ที่มีข้อมูลอยู่แล้ว (ไม่ลบ/ไม่ย้ายข้อมูลเดิม) + ตั้งฟอร์แมต
+ * คอลัมน์ phone เป็น Plain text ให้ทุกชีตที่มีคอลัมน์นี้ (Orders, Orders_Archive, Payments, OrderItems)
  * ใช้รันทุกครั้งหลังอัปเดตโค้ด backend ที่มีการเพิ่ม field ใหม่ใน SHEET_SCHEMAS (ปลอดภัย รันซ้ำได้เสมอ)
  * วิธีใช้: เลือกฟังก์ชัน repairSchema แล้วกด Run
  */
@@ -145,24 +160,28 @@ function repairSchema() {
 
   Object.keys(SHEET_SCHEMAS).forEach(function (name) {
     var sh = ss.getSheetByName(name);
+    var headers = SHEET_SCHEMAS[name];
     if (!sh) {
       sh = ss.insertSheet(name);
-      var headers = SHEET_SCHEMAS[name];
       sh.getRange(1, 1, 1, headers.length).setValues([headers]);
       sh.setFrozenRows(1);
       sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#1f2937').setFontColor('#ffffff');
+      formatPhoneColumnAsText_(sh, headers);
       report.push(name + ': สร้างชีตใหม่ทั้งหมด');
       return;
     }
     var lastCol = sh.getLastColumn();
     var existing = lastCol > 0 ? sh.getRange(1, 1, 1, lastCol).getValues()[0] : [];
-    var missing = SHEET_SCHEMAS[name].filter(function (h) { return existing.indexOf(h) === -1; });
+    var missing = headers.filter(function (h) { return existing.indexOf(h) === -1; });
     if (missing.length) {
       var startCol = existing.length + 1;
       sh.getRange(1, startCol, 1, missing.length).setValues([missing]);
       sh.getRange(1, startCol, 1, missing.length).setFontWeight('bold').setBackground('#1f2937').setFontColor('#ffffff');
       report.push(name + ': เพิ่มคอลัมน์ ' + missing.join(', '));
     }
+    // ใช้ลำดับคอลัมน์จริงของชีตตอนนี้ (existing + missing ที่เพิ่งต่อท้าย) ไม่ใช่ลำดับใน SHEET_SCHEMAS เฉยๆ
+    // เพราะชีตเก่าที่ยังไม่ผ่าน migration จัดคอลัมน์ใหม่ อาจมีลำดับคอลัมน์จริงไม่ตรงกับ schema ที่ประกาศไว้
+    if (headers.indexOf('phone') > -1) formatPhoneColumnAsText_(sh, existing.concat(missing));
     invalidateCache(name);
   });
 
@@ -205,6 +224,7 @@ function migratePaymentsAddCustomerColumns() {
   sh.setFrozenRows(1);
   sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#1f2937').setFontColor('#ffffff');
   if (matrix.length) sh.getRange(2, 1, matrix.length, headers.length).setValues(matrix);
+  formatPhoneColumnAsText_(sh, headers); // sh.clear() ด้านบนล้างฟอร์แมตเดิมไปด้วย ต้องตั้งใหม่หลังเขียนข้อมูลเสร็จ
   invalidateCache('Payments');
   return ok({ migrated: matrix.length }, 'จัดคอลัมน์ Payments ใหม่แล้ว (' + matrix.length + ' แถว)');
 }
@@ -258,6 +278,7 @@ function migrateOrderItemsBackfillFields() {
   sh.setFrozenRows(1);
   sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#1f2937').setFontColor('#ffffff');
   if (matrix.length) sh.getRange(2, 1, matrix.length, headers.length).setValues(matrix);
+  formatPhoneColumnAsText_(sh, headers); // sh.clear() ด้านบนล้างฟอร์แมตเดิมไปด้วย ต้องตั้งใหม่หลังเขียนข้อมูลเสร็จ
   invalidateCache('OrderItems');
   return ok({ migrated: matrix.length, filled_category: filledCategory, filled_order_no: filledOrderNo, filled_customer: filledCustomer },
     'จัดคอลัมน์ OrderItems ใหม่ + เติมข้อมูลย้อนหลังแล้ว (category_id: ' + filledCategory + ', order_no: ' + filledOrderNo + ', ลูกค้า: ' + filledCustomer + ' จากทั้งหมด ' + matrix.length + ' แถว)');
