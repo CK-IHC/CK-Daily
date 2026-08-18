@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>CK Daily — by IHC-Central Kitchen</title>
+<meta name="description" content="สั่งอาหาร/เครื่องดื่มล่วงหน้าเป็นรอบ จาก IHC-Central Kitchen">
+<meta name="theme-color" content="#f97316">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CK Daily">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="toastWrap" class="toast-wrap"></div>
+
+<header id="header" class="header">
+  <div class="brand" style="flex-direction:row;align-items:center;gap:8px">
+    <img src="icon.svg" alt="CK Daily" style="width:32px;height:32px;border-radius:9px">
+    <div><b>CK Daily</b><span style="display:block">by IHC-Central Kitchen</span></div>
+  </div>
+  <div class="icons">
+    <span id="pointsChip" class="points-chip">0 แต้ม</span>
+    <a href="#/notifications" class="icon-btn" id="bellBtn"><span id="bellIcon"></span><span id="bellBadge" class="badge" style="display:none">0</span></a>
+    <a href="/admin" class="icon-btn" id="adminBtn" title="สำหรับพนักงาน/ผู้ดูแลระบบ"><span id="adminIcon"></span></a>
+    <a href="#/cart" class="icon-btn" id="cartBtn"><span id="cartIcon"></span><span id="cartBadge" class="badge">0</span></a>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<nav id="bottomNav" class="bottom-nav"></nav>
+
+<script src="config.js"></script>
+<script src="icons.js"></script>
+<script src="state.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+<script src="views/login.js"></script>
+<script src="views/home.js"></script>
+<script src="views/product.js"></script>
+<script src="views/cart.js"></script>
+<script src="views/payment.js"></script>
+<script src="views/tracking.js"></script>
+<script src="views/history.js"></script>
+<script src="views/profile.js"></script>
+<script src="views/notifications.js"></script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CK Daily Admin — by IHC-Central Kitchen</title>
+<meta name="theme-color" content="#f97316">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<div id="toastWrap" class="toast-wrap"></div>
+
+<div class="admin-shell">
+  <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+  <div id="sidebarWrap">
+    <aside id="sidebar" class="sidebar"></aside>
+  </div>
+  <div class="main">
+    <div id="topbar" class="topbar">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button id="hamburger" class="hamburger">☰</button>
+        <h1 id="pageTitle">Dashboard</h1>
+      </div>
+      <a href="/" class="icon-btn-topbar" id="storefrontLink" title="ไปหน้าขายของลูกค้า"></a>
+    </div>
+    <div id="content" class="content"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="icons.js"></script>
+<script src="state.js"></script>
+<script src="api.js"></script>
+<script src="charts.js"></script>
+<script src="admin.js"></script>
+<script src="views/login.js"></script>
+<script src="views/dashboard.js"></script>
+<script src="views/liveDashboard.js"></script>
+<script src="views/orders.js"></script>
+<script src="views/kanban.js"></script>
+<script src="views/rounds.js"></script>
+<script src="views/products.js"></script>
+<script src="views/stock.js"></script>
+<script src="views/payments.js"></script>
+<script src="views/coupons.js"></script>
+<script src="views/announcements.js"></script>
+<script src="views/users.js"></script>
+<script src="views/reports.js"></script>
+<script src="views/settings.js"></script>
+</body>
+</html>
