@@ -91,6 +91,7 @@ var Charts = (function () {
     if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
     parent.style.height = h + 'px';
     parent.style.width = '100%';
+    parent.style.overflow = 'hidden'; // กันกราฟ (หรือ label ของกราฟ) ล้นออกนอกกรอบการ์ดในทุกกรณี
   }
 
   // ระยะขอบรอบโซนกราฟเท่ากันทั้ง 4 ด้าน ให้พื้นหลัง/แกนดูสมมาตร ไม่เอียงไปด้านใดด้านหนึ่ง

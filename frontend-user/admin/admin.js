@@ -100,11 +100,6 @@ var UI = (function () {
       };
     });
   }
-  function printedByLine_() {
-    var admin = State.user ? (State.user.name || State.user.phone) : '-';
-    var now = new Date().toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    return { admin: admin, printedAt: now };
-  }
   /**
    * สร้างส่วนหัวเอกสารมาตรฐานสำหรับพิมพ์ (โลโก้/ชื่อร้าน + หัวข้อรายงาน)
    * ใช้ได้ทั้งหน้าเดิม (opts.logoSrc ชี้ไฟล์ icon.svg ในแอป) และ popup window ใหม่ (opts.noLogo:true
@@ -120,11 +115,6 @@ var UI = (function () {
       '<h2 class="print-doc-title">' + escapeHtml(title) + '</h2>' +
       '<hr class="print-doc-rule">' +
     '</div>';
-  }
-  /** ผู้พิมพ์ + วันเวลา — วางมุมล่างซ้ายของหน้ากระดาษ (fixed ตอนพิมพ์) แทนที่จะอยู่ใต้หัวเรื่อง */
-  function printFooterHtml() {
-    var who = printedByLine_();
-    return '<div class="print-doc-footer">พิมพ์โดย: <b>' + escapeHtml(who.admin) + '</b> &nbsp;|&nbsp; วันที่พิมพ์: <b>' + who.printedAt + '</b></div>';
   }
   /**
    * พิมพ์เฉพาะ "ส่วน" (scopeEl) ที่มีปุ่มพิมพ์นั้นๆ ไม่พิมพ์ทั้งหน้า — โคลนเนื้อหาของ scopeEl ไปใส่
@@ -153,7 +143,6 @@ var UI = (function () {
     container.id = 'printScopeContainer';
     container.innerHTML = printHeaderHtml(title, { logoSrc: '../icon.svg' });
     container.appendChild(clone);
-    container.insertAdjacentHTML('beforeend', printFooterHtml());
     document.body.appendChild(container);
 
     var cleanup = function () {
@@ -164,7 +153,7 @@ var UI = (function () {
     window.print();
     setTimeout(cleanup, 5000); // เผื่อเบราว์เซอร์ไม่ยิง afterprint (บาง browser/บาง OS)
   }
-  return { toast: toast, money: money, loading: loading, fmtTime: fmtTime, escapeHtml: escapeHtml, exportCsv: exportCsv, modal: modal, statusLabel: statusLabel, printHeaderHtml: printHeaderHtml, printFooterHtml: printFooterHtml, printWithHeader: printWithHeader, sortRows: sortRows, wireSortHeaders: wireSortHeaders, makeTableSortable: makeTableSortable };
+  return { toast: toast, money: money, loading: loading, fmtTime: fmtTime, escapeHtml: escapeHtml, exportCsv: exportCsv, modal: modal, statusLabel: statusLabel, printHeaderHtml: printHeaderHtml, printWithHeader: printWithHeader, sortRows: sortRows, wireSortHeaders: wireSortHeaders, makeTableSortable: makeTableSortable };
 })();
 
 var Views = {};

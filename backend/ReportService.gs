@@ -11,10 +11,11 @@ function dateRangeFromPayload_(payload) {
   return { from: from, to: to };
 }
 
-function ordersInRange_(from, to, onlyCompleted) {
+function ordersInRange_(from, to, onlyCompleted, roundId) {
   return findAll('Orders', function (o) {
     var d = toDate(o.placed_at);
     if (!d || d < from || d > to) return false;
+    if (roundId && o.round_id !== roundId) return false;
     if (onlyCompleted) return o.status === 'completed';
     return true;
   });
@@ -93,19 +94,6 @@ function adminLiveDashboard(payload, token) {
   var costMap = buildProductCostMap_();
   var cogsToday = todayOrders.reduce(function (s, o) { return s + cogsForOrder_(o.order_id, costMap); }, 0);
 
-  var trend = [];
-  for (var i = 13; i >= 0; i--) {
-    var day = addDays(new Date(), -i);
-    var from = new Date(day); from.setHours(0, 0, 0, 0);
-    var to = new Date(day); to.setHours(23, 59, 59, 999);
-    var dayOrders = ordersInRange_(from, to, false).filter(function (o) { return o.status !== 'cancelled'; });
-    trend.push({
-      date: Utilities.formatDate(day, TIMEZONE, 'yyyy-MM-dd'),
-      sales: round2(dayOrders.reduce(function (s, o) { return s + numFrom(o.grand_total); }, 0)),
-      orders: dayOrders.length
-    });
-  }
-
   var todayAgg = productSalesAgg_({ from: todayStart, to: todayEnd });
   var topToday = Object.keys(todayAgg).map(function (k) { todayAgg[k].revenue = round2(todayAgg[k].revenue); return todayAgg[k]; })
     .sort(function (a, b) { return b.revenue - a.revenue; }).slice(0, 8);
@@ -134,7 +122,6 @@ function adminLiveDashboard(payload, token) {
     pending_slips_amount: round2(pendingSlips.reduce(function (s, o) { return s + numFrom(o.grand_total); }, 0)),
     unpaid_count: unpaidOrders.length,
     unpaid_amount: round2(unpaidOrders.reduce(function (s, o) { return s + numFrom(o.grand_total); }, 0)),
-    sales_trend_14d: trend,
     top_products_today: topToday,
     low_stock_alerts: lowStock,
     recent_orders: recentOrders,
@@ -146,7 +133,8 @@ function adminLiveDashboard(payload, token) {
 function adminReportsSalesByTime(payload, token) {
   requireRole(token, ['manager', 'admin']);
   var range = dateRangeFromPayload_(payload);
-  var orders = ordersInRange_(range.from, range.to, true);
+  var roundId = (payload && payload.round_id) || '';
+  var orders = ordersInRange_(range.from, range.to, true, roundId);
   var groupBy = (payload && payload.group_by) || 'day';
   var buckets = {};
   orders.forEach(function (o) {
@@ -164,7 +152,7 @@ function adminReportsSalesByTime(payload, token) {
   var prevSpanMs = range.to - range.from;
   var prevFrom = new Date(range.from.getTime() - prevSpanMs - 1);
   var prevTo = new Date(range.from.getTime() - 1);
-  var prevOrders = ordersInRange_(prevFrom, prevTo, true);
+  var prevOrders = ordersInRange_(prevFrom, prevTo, true, roundId);
   var currentTotal = round2(orders.reduce(function (s, o) { return s + numFrom(o.grand_total); }, 0));
   var prevTotal = round2(prevOrders.reduce(function (s, o) { return s + numFrom(o.grand_total); }, 0));
   var changePct = prevTotal > 0 ? round2(((currentTotal - prevTotal) / prevTotal) * 100) : null;

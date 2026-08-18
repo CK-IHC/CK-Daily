@@ -37,6 +37,9 @@ Views.dashboard = function (container) {
   var selectedYear = new Date().getFullYear();
   var YEAR_OPTIONS_ = [0, 1, 2, 3, 4].map(function (i) { return selectedYear - i; });
   var refreshTimer = null;
+  var salesRoundId = '';
+  var salesDateFrom = '', salesDateTo = '';
+  var rounds_ = [];
 
   if (!canView) {
     Api.call('admin.orders.list', { status: 'pending', page_size: 10 }).then(function (data) {
@@ -80,14 +83,19 @@ Views.dashboard = function (container) {
         '<span id="liveUpdatedAt" style="margin-left:auto"></span>' +
       '</div>' +
       '<div class="kpi-grid" id="kpiGrid">' + kpiGridHtml_(d) + '</div>' +
-      '<div class="card"><div class="card-head"><h3>ยอดขายรวม</h3>' +
-        '<div class="no-print"><select id="groupBySelect" class="form-control" style="width:auto;display:inline-block">' +
+      '<div class="card"><div class="card-head" style="flex-wrap:wrap;gap:8px"><h3>ยอดขายรวม</h3>' +
+        '<div class="no-print" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">' +
+        '<select id="groupBySelect" class="form-control" style="width:auto;display:inline-block">' +
           '<option value="day">รายวัน (30 วันล่าสุด)</option><option value="week">รายสัปดาห์</option><option value="month">รายเดือน (Jan-Dec)</option><option value="year">รายปี</option>' +
-        '</select> ' +
+        '</select>' +
         '<select id="yearSelect" class="form-control" style="width:auto;display:inline-block">' +
           YEAR_OPTIONS_.map(function (y) { return '<option value="' + y + '"' + (y === selectedYear ? ' selected' : '') + '>ปี ' + y + '</option>'; }).join('') +
-        '</select> <button id="btnPrintSales" class="btn btn-outline btn-sm">🖨️ พิมพ์</button></div></div>' +
-        '<canvas id="salesChart" height="90"></canvas></div>' +
+        '</select>' +
+        '<select id="salesRoundSelect" class="form-control" style="width:auto;display:inline-block"><option value="">ทุกรอบ</option></select>' +
+        '<label style="font-size:12px;color:var(--text-muted)">จาก <input id="salesDateFrom" type="date" class="form-control"></label>' +
+        '<label style="font-size:12px;color:var(--text-muted)">ถึง <input id="salesDateTo" type="date" class="form-control"></label>' +
+        '<button id="btnPrintSales" class="btn btn-outline btn-sm">🖨️ พิมพ์</button></div></div>' +
+        '<canvas id="salesChart" height="140"></canvas></div>' +
       '<div class="card"><h3 id="itemChartTitle">ยอดขายแยกรายสินค้า (Top 10) — ปี ' + selectedYear + '</h3><div id="itemChartArea"><canvas id="itemChart" height="100"></canvas></div></div>' +
       '<div class="card"><h3>ยอดขายแยกรายรอบ</h3><div id="roundSalesArea">' + UI.loading() + '</div></div>' +
       '<div class="card"><div class="card-head"><h3>ออเดอร์ที่ต้องดำเนินการ</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintAction">🖨️ พิมพ์</button></div><div id="actionOrders">' + UI.loading() + '</div></div>';
@@ -96,6 +104,15 @@ Views.dashboard = function (container) {
     document.getElementById('btnPrintAction').onclick = function (e) { UI.printWithHeader('ออเดอร์ที่ต้องดำเนินการ', e.currentTarget.closest('.card')); };
     document.getElementById('groupBySelect').onchange = function (e) { groupBy = e.target.value; loadSalesChart(); };
     document.getElementById('yearSelect').onchange = function (e) { selectedYear = Number(e.target.value); loadSalesChart(); loadTopProducts(); };
+    document.getElementById('salesRoundSelect').onchange = function (e) { salesRoundId = e.target.value; loadSalesChart(); };
+    document.getElementById('salesDateFrom').onchange = function (e) { salesDateFrom = e.target.value; loadSalesChart(); };
+    document.getElementById('salesDateTo').onchange = function (e) { salesDateTo = e.target.value; loadSalesChart(); };
+    Api.call('admin.rounds.list').then(function (data) {
+      rounds_ = data;
+      var sel = document.getElementById('salesRoundSelect');
+      if (!sel) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
+      sel.insertAdjacentHTML('beforeend', rounds_.map(function (r) { return '<option value="' + r.round_id + '">' + UI.escapeHtml(r.round_name) + '</option>'; }).join(''));
+    }).catch(function () {});
 
     loadAll_();
     touchLiveDot_();
@@ -153,9 +170,16 @@ Views.dashboard = function (container) {
 
   function loadSalesChart() {
     var payload = { group_by: groupBy };
-    if (groupBy === 'month') { payload.date_from = selectedYear + '-01-01'; payload.date_to = selectedYear + '-12-31'; }
-    if (groupBy === 'week') payload.date_from = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
-    if (groupBy === 'year') payload.date_from = new Date(new Date().getFullYear() - 4, 0, 1).toISOString().slice(0, 10);
+    // ค่าเริ่มต้นตามช่วงเวลาที่เลือก (ถ้าไม่ได้ระบุ date from/to เองด้านล่าง) — เดิม groupBy==='day' ไม่ได้ตั้ง
+    // date_from เลย ทำให้ backend fallback เหลือแค่ 7 วันล่าสุด ทั้งที่ label บอกว่า "30 วันล่าสุด" (บั๊ก แก้แล้ว)
+    if (groupBy === 'day') payload.date_from = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
+    else if (groupBy === 'month') { payload.date_from = selectedYear + '-01-01'; payload.date_to = selectedYear + '-12-31'; }
+    else if (groupBy === 'week') payload.date_from = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+    else if (groupBy === 'year') payload.date_from = new Date(new Date().getFullYear() - 4, 0, 1).toISOString().slice(0, 10);
+    // ตัวกรอง date from/to เอง (ถ้าตั้งไว้) ทับค่าเริ่มต้นตาม groupBy เสมอ
+    if (salesDateFrom) payload.date_from = salesDateFrom;
+    if (salesDateTo) payload.date_to = salesDateTo;
+    if (salesRoundId) payload.round_id = salesRoundId;
     Api.call('admin.reports.salesByTime', payload).then(function (r) {
       if (!document.getElementById('salesChart')) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อน refresh รอบถัดไปจะทำงาน
       var labels = r.series.map(function (s) {

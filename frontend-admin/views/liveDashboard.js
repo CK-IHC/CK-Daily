@@ -7,6 +7,8 @@ var LIVE_DASHBOARD_REFRESH_MS_ = 30000;
 Views.liveDashboard = function (container) {
   container.innerHTML = UI.loading();
   var refreshTimer = null;
+  var trendDateFrom = new Date(Date.now() - 13 * 86400000).toISOString().slice(0, 10);
+  var trendDateTo = new Date().toISOString().slice(0, 10);
 
   function kpi(label, value, sub, color) {
     return '<div class="kpi-card"><div class="label">' + label + '</div><div class="value"' + (color ? ' style="color:' + color + '"' : '') + '>' + value + '</div>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>';
@@ -69,23 +71,28 @@ Views.liveDashboard = function (container) {
             '<span id="liveUpdatedAt2" style="margin-left:auto"></span>' +
           '</div>' +
           '<div class="kpi-grid" id="liveKpiGrid"></div>' +
-          '<div class="card"><div class="card-head"><h3>แนวโน้มยอดขาย 14 วันล่าสุด</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintTrend">🖨️ พิมพ์</button></div><canvas id="liveTrendChart" height="90"></canvas></div>' +
+          '<div class="card"><div class="card-head" style="flex-wrap:wrap;gap:8px"><h3>แนวโน้มยอดขาย</h3>' +
+            '<div class="no-print" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">' +
+            '<label style="font-size:12px;color:var(--text-muted)">จาก <input id="trendDateFrom" type="date" class="form-control" value="' + trendDateFrom + '"></label>' +
+            '<label style="font-size:12px;color:var(--text-muted)">ถึง <input id="trendDateTo" type="date" class="form-control" value="' + trendDateTo + '"></label>' +
+            '<button id="btnPrintTrend" class="btn btn-outline btn-sm">🖨️ พิมพ์</button></div></div>' +
+            '<canvas id="liveTrendChart" height="140"></canvas></div>' +
           '<div class="card"><div class="card-head"><h3>สินค้าขายดีวันนี้</h3></div><div id="liveTopProducts"><canvas id="liveTopChart" height="100"></canvas></div></div>' +
           '<div class="card"><div class="card-head"><h3>⚠️ แจ้งเตือนสต็อกใกล้หมด/หมด</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintStock">🖨️ พิมพ์</button></div><div id="liveLowStock">' + UI.loading() + '</div></div>' +
           '<div class="card"><div class="card-head"><h3>ออเดอร์ล่าสุด</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintOrders">🖨️ พิมพ์</button></div><div id="liveRecentOrders">' + UI.loading() + '</div></div>' +
           '<div class="card"><div class="card-head"><h3>การเคลื่อนไหวสต็อกล่าสุด</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintMovements">🖨️ พิมพ์</button></div><div id="liveRecentMovements">' + UI.loading() + '</div></div>';
-        document.getElementById('btnPrintTrend').onclick = function (e) { UI.printWithHeader('แนวโน้มยอดขาย 14 วันล่าสุด', e.currentTarget.closest('.card')); };
+        document.getElementById('btnPrintTrend').onclick = function (e) { UI.printWithHeader('แนวโน้มยอดขาย', e.currentTarget.closest('.card')); };
         document.getElementById('btnPrintStock').onclick = function (e) { UI.printWithHeader('แจ้งเตือนสต็อกใกล้หมด/หมด', e.currentTarget.closest('.card')); };
         document.getElementById('btnPrintOrders').onclick = function (e) { UI.printWithHeader('ออเดอร์ล่าสุด', e.currentTarget.closest('.card')); };
         document.getElementById('btnPrintMovements').onclick = function (e) { UI.printWithHeader('การเคลื่อนไหวสต็อกล่าสุด', e.currentTarget.closest('.card')); };
+        document.getElementById('trendDateFrom').onchange = function (e) { trendDateFrom = e.target.value; loadTrendChart(); };
+        document.getElementById('trendDateTo').onchange = function (e) { trendDateTo = e.target.value; loadTrendChart(); };
       }
 
       var grid = document.getElementById('liveKpiGrid');
       if (grid) grid.innerHTML = kpiGridHtml_(d);
 
-      if (document.getElementById('liveTrendChart')) {
-        Charts.line('liveTrendChart', d.sales_trend_14d.map(function (t) { return t.date.slice(5); }), [{ label: 'ยอดขาย', data: d.sales_trend_14d.map(function (t) { return t.sales; }) }]);
-      }
+      loadTrendChart();
       var topArea = document.getElementById('liveTopProducts');
       if (topArea) {
         if (!d.top_products_today.length) { topArea.innerHTML = '<div class="empty-state">ยังไม่มียอดขายวันนี้</div>'; }
@@ -106,6 +113,19 @@ Views.liveDashboard = function (container) {
       if (!document.getElementById('liveKpiGrid')) container.innerHTML = '<div class="empty-state">' + UI.escapeHtml(err.message) + '</div>';
       else UI.toast('รีเฟรชข้อมูลไม่สำเร็จ: ' + err.message, 'error');
     });
+  }
+
+  /** โหลดกราฟแนวโน้มยอดขายแยกอิสระจาก d.sales_trend_14d (ช่วงวันที่ fix 14 วันเดิม) — ใช้ตัวกรอง date from/to
+   * เอง ผ่าน admin.reports.salesByTime (group_by=day) ซึ่ง backend เรียง period ให้ตามวันที่จากน้อยไปมากอยู่แล้ว */
+  function loadTrendChart() {
+    if (!document.getElementById('liveTrendChart')) return;
+    var payload = { group_by: 'day' };
+    if (trendDateFrom) payload.date_from = trendDateFrom;
+    if (trendDateTo) payload.date_to = trendDateTo;
+    Api.call('admin.reports.salesByTime', payload).then(function (r) {
+      if (!document.getElementById('liveTrendChart')) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
+      Charts.line('liveTrendChart', r.series.map(function (s) { return s.period.slice(5); }), [{ label: 'ยอดขาย', data: r.series.map(function (s) { return s.sales; }) }]);
+    }).catch(function () {});
   }
 
   load();

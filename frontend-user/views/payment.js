@@ -155,7 +155,9 @@ Views.payment = function (container, params) {
       '<div style="border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;padding:10px 0;margin-bottom:14px">' +
         (order.items || []).map(function (i) {
           return '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:15px">' +
-            '<span>' + UI.escapeHtml(i.product_name) + (i.is_frozen ? ' ❄ <span style="color:#2563eb;font-size:12px;font-weight:600">(Freezing)</span>' : '') + ' x' + i.qty + '</span><span>' + UI.money(i.line_total) + '</span></div>';
+            '<span>' + UI.escapeHtml(i.product_name) + (i.is_frozen ? ' ❄ <span style="color:#2563eb;font-size:12px;font-weight:600">(Freezing)</span>' : '') + ' x' + i.qty +
+            (i.note ? '<br><span style="font-size:12px;color:#666;font-weight:400">หมายเหตุ: ' + UI.escapeHtml(i.note) + '</span>' : '') +
+            '</span><span>' + UI.money(i.line_total) + '</span></div>';
         }).join('') +
       '</div>' +
       '<div style="display:flex;justify-content:space-between;font-size:19px;font-weight:800;margin-bottom:18px"><span>ยอดสุทธิ</span><span>' + UI.money(order.grand_total) + '</span></div>' +

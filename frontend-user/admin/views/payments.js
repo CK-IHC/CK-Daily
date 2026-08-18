@@ -13,6 +13,12 @@ Views.payments = function (container) {
   container.innerHTML =
     '<div class="card">' +
       '<div class="tabs-row no-print">' + PAYMENT_TABS_.map(function (t) { return '<button class="tab-btn ' + (t.key === tab ? 'active' : '') + '" data-tab="' + t.key + '">' + t.label + '</button>'; }).join('') + '</div>' +
+      '<div class="filters-row no-print">' +
+        '<input id="fSearch" class="form-control" placeholder="ค้นหา (เลขที่/ชื่อลูกค้า/เบอร์โทร)" style="min-width:220px">' +
+        '<label style="font-size:12px;color:var(--text-muted)">จาก <input id="fDateFrom" type="date" class="form-control"></label>' +
+        '<label style="font-size:12px;color:var(--text-muted)">ถึง <input id="fDateTo" type="date" class="form-control"></label>' +
+        '<button id="btnFilter" class="btn btn-outline">กรอง</button>' +
+      '</div>' +
       '<div class="card-head"><h3 id="payTitle">สลิปรอตรวจสอบ</h3><div class="no-print" style="display:flex;gap:8px">' +
         '<button id="btnPrint" class="btn btn-outline">🖨️ พิมพ์</button>' +
         '<button id="btnExport" class="btn btn-outline">Export CSV</button></div></div>' +
@@ -28,6 +34,9 @@ Views.payments = function (container) {
     };
   });
 
+  document.getElementById('btnFilter').onclick = load;
+  document.getElementById('fSearch').onkeydown = function (e) { if (e.key === 'Enter') load(); };
+
   document.getElementById('btnExport').onclick = function () {
     UI.exportCsv('payments-' + tab + '.csv', lastRows.map(function (p) {
       return { order_no: p.order_no, customer: p.customer_name, phone: p.phone, amount: p.amount, method: p.method, status: p.status, verified_by: p.verified_by, verified_at: p.verified_at, created_at: p.created_at };
@@ -41,7 +50,14 @@ Views.payments = function (container) {
 
   function load() {
     document.getElementById('area').innerHTML = UI.loading();
-    Api.call('admin.payments.list', { status: tab }).then(function (rows) { lastRows = rows; render(rows); }).catch(function (err) { UI.toast(err.message, 'error'); });
+    var payload = {
+      status: tab,
+      search: document.getElementById('fSearch').value.trim(),
+      date_from: document.getElementById('fDateFrom').value,
+      date_to: document.getElementById('fDateTo').value
+    };
+    Object.keys(payload).forEach(function (k) { if (!payload[k]) delete payload[k]; });
+    Api.call('admin.payments.list', payload).then(function (rows) { lastRows = rows; render(rows); }).catch(function (err) { UI.toast(err.message, 'error'); });
   }
 
   function render(rows) {

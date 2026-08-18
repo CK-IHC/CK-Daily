@@ -117,7 +117,7 @@ function printOrderHistoryReport_(items, tabLabel) {
   var sum = items.reduce(function (s, o) { return s + Number(o.grand_total || 0); }, 0);
   var custName = (State.user && State.user.name) || '';
   var custPhone = (State.user && State.user.phone) || '';
-  var printedAt = 'พิมพ์เมื่อ: ' + new Date().toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  var logoUrl = location.origin + '/icon.svg';
   var html = '<!DOCTYPE html><html><head><title>ประวัติการสั่งซื้อ</title><meta charset="utf-8">' +
     '<style>@page{margin:14mm 12mm 15mm 12mm}' +
     'body{font-family:Arial,sans-serif;padding:24px;color:#000}' +
@@ -127,15 +127,13 @@ function printOrderHistoryReport_(items, tabLabel) {
     '.sub{color:#666;font-size:12px;margin-bottom:16px}' +
     'table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left}' +
     'th{background:#f3f4f6}tr{page-break-inside:avoid}thead{display:table-header-group}' +
-    'tfoot{display:table-footer-group}tfoot .totalRow td{font-weight:800;border-top:2px solid #333}' +
-    'tfoot .printedRow td{border-top:none;border-bottom:none;padding-top:8px;font-size:10px;color:#333;font-weight:400}</style></head><body>' +
-    '<div class="print-doc-brand"><b>CK Daily</b><span>by IHC-Central Kitchen</span></div>' +
+    'tfoot{display:table-footer-group}tfoot td{font-weight:800;border-top:2px solid #333}</style></head><body>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px"><img src="' + logoUrl + '" style="width:44px;height:44px;border-radius:10px" alt="logo"><div class="print-doc-brand"><b>CK Daily</b><span>by IHC-Central Kitchen</span></div></div>' +
     '<h2 class="print-doc-title">ประวัติการสั่งซื้อ — ' + UI.escapeHtml(tabLabel) + '</h2>' +
     '<hr class="print-doc-rule">' +
     '<div class="sub">' + UI.escapeHtml(custName) + (custPhone ? ' · ' + UI.escapeHtml(custPhone) : '') + '<br>ทั้งหมด ' + items.length + ' รายการ</div>' +
     '<table><thead><tr><th>เลขที่</th><th>เวลา</th><th>สถานะ</th><th style="text-align:right">ยอด</th><th>หมายเหตุ</th></tr></thead>' +
-    '<tfoot><tr class="totalRow"><td colspan="3">รวม</td><td style="text-align:right">' + UI.money(sum) + '</td><td></td></tr>' +
-    '<tr class="printedRow"><td colspan="5">' + UI.escapeHtml(printedAt) + '</td></tr></tfoot>' +
+    '<tfoot><tr><td colspan="3">รวม</td><td style="text-align:right">' + UI.money(sum) + '</td><td></td></tr></tfoot>' +
     '<tbody>' + rows + '</tbody></table>' +
     '<script>window.onload=function(){window.print();};<\/script></body></html>';
   win.document.open(); win.document.write(html); win.document.close();

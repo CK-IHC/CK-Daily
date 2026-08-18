@@ -355,7 +355,7 @@ function awardLoyaltyPoints_(order) {
 }
 
 /** ===================== Admin: Orders ===================== */
-/** เงื่อนไขกรองร่วมของ admin.orders.list / admin.orders.summary */
+/** เงื่อนไขกรองร่วมของ admin.orders.list / admin.orders.summary / admin.orderItems.export */
 function orderMatchesFilters_(o, payload) {
   if (payload.round_id && o.round_id !== payload.round_id) return false;
   if (payload.status && normalizeOrderStatus_(o.status) !== payload.status) return false;
@@ -364,6 +364,15 @@ function orderMatchesFilters_(o, payload) {
   if (payload.order_no && String(o.order_no || '').indexOf(payload.order_no) === -1) return false;
   if (payload.date_from && toDate(o.placed_at) < toDate(payload.date_from)) return false;
   if (payload.date_to && toDate(o.placed_at) > toDate(payload.date_to)) return false;
+  // ช่องค้นหาเดียว ค้นทุกหัวข้อพร้อมกัน (OR): เลขที่ออเดอร์ / ชื่อลูกค้า / เบอร์โทร — ใช้แทนช่องค้นหาเบอร์โทรอย่างเดียวแบบเดิม
+  if (payload.search) {
+    var q = String(payload.search).trim();
+    var qDigits = q.replace(/\D/g, '');
+    var matchesOrderNo = String(o.order_no || '').toLowerCase().indexOf(q.toLowerCase()) > -1;
+    var matchesName = String(o.customer_name || '').toLowerCase().indexOf(q.toLowerCase()) > -1;
+    var matchesPhone = qDigits.length > 0 && normalizePhone_(o.phone).indexOf(qDigits) > -1;
+    if (!matchesOrderNo && !matchesName && !matchesPhone) return false;
+  }
   return true;
 }
 
@@ -463,11 +472,23 @@ function adminOrderItemsExport(payload, token) {
   var orderIds = {}; orders.forEach(function (o) { orderIds[o.order_id] = true; });
   var items = findAll('OrderItems', function (i) { return orderIds[i.order_id]; })
     .sort(function (a, b) { return toDate(b.created_at) - toDate(a.created_at); });
+
+  // "ครั้งที่" (ลำดับการสั่งของเบอร์นี้ทั้งหมด/จำนวนครั้งทั้งหมด) — คำนวณจากออเดอร์ทั้งหมด (ไม่ใช่แค่ที่กรองอยู่)
+  // ให้ตรงกับตัวเลขที่แสดงในหน้าออเดอร์ทั้งหมดเสมอ
+  var visitByOrderId_ = {};
+  var phoneGroups = {};
+  findAll('Orders', null).forEach(function (o) { var p = normalizePhone_(o.phone); (phoneGroups[p] = phoneGroups[p] || []).push(o); });
+  Object.keys(phoneGroups).forEach(function (p) {
+    phoneGroups[p].sort(function (a, b) { return toDate(a.placed_at) - toDate(b.placed_at); });
+    phoneGroups[p].forEach(function (o, idx) { visitByOrderId_[o.order_id] = { seq: idx + 1, total: phoneGroups[p].length }; });
+  });
+
   return ok(items.map(function (i) {
+    var visit = visitByOrderId_[i.order_id] || { seq: 1, total: 1 };
     return {
       order_no: i.order_no || '', order_id: i.order_id, sku: i.sku || '',
       customer_name: i.customer_name || '', user_id: i.user_id || '', phone: i.phone || '', category_id: i.category_id || '',
-      product_name: i.product_name, qty: numFrom(i.qty), unit_price: numFrom(i.unit_price), line_total: numFrom(i.line_total),
+      visit_no: visit.seq + '/' + visit.total, product_name: i.product_name, qty: numFrom(i.qty), unit_price: numFrom(i.unit_price), line_total: numFrom(i.line_total),
       note: i.note || '', created_at: i.created_at
     };
   }));
@@ -548,11 +569,29 @@ function adminOrdersRefund(payload, token) {
 function adminPaymentsList(payload, token) {
   requireRole(token, ['staff', 'manager', 'admin']);
   payload = payload || {};
-  var rows = findAll('Payments', function (p) { return !payload.status || p.status === payload.status; })
-    .sort(function (a, b) { return toDate(b.created_at) - toDate(a.created_at); });
+  var rows = findAll('Payments', function (p) {
+    if (payload.status && p.status !== payload.status) return false;
+    if (payload.date_from && toDate(p.created_at) < toDate(payload.date_from)) return false;
+    if (payload.date_to && toDate(p.created_at) > toDate(payload.date_to)) return false;
+    return true;
+  }).sort(function (a, b) { return toDate(b.created_at) - toDate(a.created_at); });
   var orderIds = {}; rows.forEach(function (p) { orderIds[p.order_id] = true; });
   var orders = findAll('Orders', function (o) { return orderIds[o.order_id]; }, true);
   var orderById = {}; orders.forEach(function (o) { orderById[o.order_id] = o; });
+
+  // ช่องค้นหาเดียว ค้นทุกหัวข้อพร้อมกัน (OR): เลขที่ออเดอร์ (อยู่บน Orders ต้อง join ก่อน) / ชื่อลูกค้า / เบอร์โทร
+  if (payload.search) {
+    var q = String(payload.search).trim().toLowerCase();
+    var qDigits = q.replace(/\D/g, '');
+    rows = rows.filter(function (p) {
+      var o = orderById[p.order_id] || {};
+      var matchesOrderNo = String(o.order_no || '').toLowerCase().indexOf(q) > -1;
+      var matchesName = String(p.customer_name || o.customer_name || '').toLowerCase().indexOf(q) > -1;
+      var matchesPhone = qDigits.length > 0 && normalizePhone_(p.phone || o.phone).indexOf(qDigits) > -1;
+      return matchesOrderNo || matchesName || matchesPhone;
+    });
+  }
+
   var items = findAll('OrderItems', function (i) { return orderIds[i.order_id]; });
   var itemsByOrder = {};
   items.forEach(function (i) { (itemsByOrder[i.order_id] = itemsByOrder[i.order_id] || []).push({ product_name: i.product_name, qty: numFrom(i.qty) }); });
