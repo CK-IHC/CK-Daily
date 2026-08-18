@@ -64,7 +64,7 @@ function priceCartItems_(items, strict) {
 
     var unitPrice = round2(numFrom(product.price) + optionDelta);
     computed.push({
-      product_id: product.product_id, sku: product.sku || '', product_name: product.name, unit_price: unitPrice, qty: qty,
+      product_id: product.product_id, category_id: product.category_id || '', sku: product.sku || '', product_name: product.name, unit_price: unitPrice, qty: qty,
       line_total: round2(unitPrice * qty), note: String(it.note || '').slice(0, 200),
       options_json: JSON.stringify(optionSnapshot), option_names: optionSnapshot.map(function (o) { return o.name; }),
       track_stock: boolFrom(product.track_stock), is_frozen: boolFrom(product.is_frozen)

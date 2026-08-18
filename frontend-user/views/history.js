@@ -112,26 +112,27 @@ function printOrderHistoryReport_(items, tabLabel) {
   if (!win) { UI.toast('เบราว์เซอร์บล็อกป๊อปอัป กรุณาอนุญาตแล้วลองใหม่', 'error'); return; }
   var rows = items.map(function (o) {
     return '<tr><td>#' + UI.escapeHtml(o.order_no) + '</td><td>' + UI.fmtTime(o.placed_at) + '</td>' +
-      '<td>' + (STATUS_LABEL_TH_[o.status] || o.status) + '</td><td style="text-align:right">' + UI.money(o.grand_total) + '</td></tr>';
+      '<td>' + (STATUS_LABEL_TH_[o.status] || o.status) + '</td><td style="text-align:right">' + UI.money(o.grand_total) + '</td><td>' + UI.escapeHtml(o.delivery_note || '-') + '</td></tr>';
   }).join('');
   var sum = items.reduce(function (s, o) { return s + Number(o.grand_total || 0); }, 0);
   var custName = (State.user && State.user.name) || '';
   var custPhone = (State.user && State.user.phone) || '';
   var html = '<!DOCTYPE html><html><head><title>ประวัติการสั่งซื้อ</title><meta charset="utf-8">' +
-    '<style>body{font-family:Arial,sans-serif;padding:24px 24px 46px;color:#000}' +
+    '<style>@page{size:A4;margin:14mm 12mm 26mm 12mm}' +
+    'body{font-family:Arial,sans-serif;padding:24px 24px 46px;color:#000}' +
     '.print-doc-brand{line-height:1.3}.print-doc-brand b{font-size:17px}.print-doc-brand span{display:block;font-size:11px;color:#555}' +
     '.print-doc-title{font-size:20px;margin:10px 0 4px}' +
     '.print-doc-rule{border:none;border-top:2px solid #111;margin:10px 0 16px}' +
     '.print-doc-footer{font-size:10px;color:#333;position:fixed;bottom:8mm;left:12mm}' +
     '.sub{color:#666;font-size:12px;margin-bottom:16px}' +
     'table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left}' +
-    'th{background:#f3f4f6}tfoot td{font-weight:800;border-top:2px solid #333}</style></head><body>' +
+    'th{background:#f3f4f6}tfoot td{font-weight:800;border-top:2px solid #333}tr{page-break-inside:avoid}thead{display:table-header-group}</style></head><body>' +
     '<div class="print-doc-brand"><b>CK Daily</b><span>by IHC-Central Kitchen</span></div>' +
     '<h2 class="print-doc-title">ประวัติการสั่งซื้อ — ' + UI.escapeHtml(tabLabel) + '</h2>' +
     '<hr class="print-doc-rule">' +
     '<div class="sub">' + UI.escapeHtml(custName) + (custPhone ? ' · ' + UI.escapeHtml(custPhone) : '') + '<br>ทั้งหมด ' + items.length + ' รายการ</div>' +
-    '<table><thead><tr><th>เลขที่</th><th>เวลา</th><th>สถานะ</th><th style="text-align:right">ยอด</th></tr></thead><tbody>' + rows + '</tbody>' +
-    '<tfoot><tr><td colspan="3">รวม</td><td style="text-align:right">' + UI.money(sum) + '</td></tr></tfoot></table>' +
+    '<table><thead><tr><th>เลขที่</th><th>เวลา</th><th>สถานะ</th><th style="text-align:right">ยอด</th><th>หมายเหตุ</th></tr></thead><tbody>' + rows + '</tbody>' +
+    '<tfoot><tr><td colspan="3">รวม</td><td style="text-align:right">' + UI.money(sum) + '</td><td></td></tr></tfoot></table>' +
     '<div class="print-doc-footer">พิมพ์เมื่อ: ' + new Date().toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</div>' +
     '<script>window.onload=function(){window.print();};<\/script></body></html>';
   win.document.open(); win.document.write(html); win.document.close();

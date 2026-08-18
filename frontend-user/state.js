@@ -9,7 +9,7 @@ var State = (function () {
       var raw = localStorage.getItem(KEY);
       if (raw) return JSON.parse(raw);
     } catch (e) { /* ignore */ }
-    return { token: null, user: null, cart: [], roundId: null, orderType: 'pickup', address: '', couponCode: '', paymentMethod: 'cash' };
+    return { token: null, user: null, cart: [], roundId: null, orderType: 'pickup', address: '', couponCode: '', paymentMethod: 'cash', deliveryNote: '' };
   }
 
   var data = load();
@@ -32,6 +32,8 @@ var State = (function () {
     set address(v) { data.address = v; save(); },
     get couponCode() { return data.couponCode; },
     set couponCode(v) { data.couponCode = v; save(); },
+    get deliveryNote() { return data.deliveryNote; },
+    set deliveryNote(v) { data.deliveryNote = v; save(); },
     get paymentMethod() { return data.paymentMethod; },
     set paymentMethod(v) { data.paymentMethod = v; save(); },
 

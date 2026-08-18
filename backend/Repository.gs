@@ -12,7 +12,7 @@ var SHEET_SCHEMAS = {
   ProductOptions: ['option_id', 'product_id', 'group_name', 'option_name', 'price_delta', 'is_required', 'max_select', 'stock_link_product_id', 'created_at', 'updated_at', 'is_deleted'],
   Rounds: ['round_id', 'round_name', 'open_at', 'close_at', 'delivery_at', 'status', 'capacity', 'current_orders', 'note', 'created_at', 'updated_at', 'is_deleted', 'delivery_location'],
   Orders: ['order_id', 'order_no', 'user_id', 'phone', 'customer_name', 'round_id', 'order_type', 'address', 'delivery_note', 'subtotal', 'discount', 'coupon_code', 'delivery_fee', 'vat', 'grand_total', 'payment_method', 'payment_status', 'slip_url', 'slip_urls', 'status', 'cancel_reason', 'placed_at', 'confirmed_at', 'ready_at', 'completed_at', 'staff_id', 'created_at', 'updated_at', 'is_deleted', 'photo_url', 'admin_note'],
-  OrderItems: ['item_id', 'order_id', 'product_id', 'sku', 'product_name', 'options_json', 'unit_price', 'qty', 'line_total', 'note', 'created_at', 'updated_at', 'is_deleted'],
+  OrderItems: ['item_id', 'order_id', 'product_id', 'category_id', 'sku', 'product_name', 'options_json', 'unit_price', 'qty', 'line_total', 'note', 'created_at', 'updated_at', 'is_deleted'],
   StockMovements: ['movement_id', 'product_id', 'sku', 'type', 'qty_change', 'qty_before', 'qty_after', 'ref_type', 'ref_id', 'reason', 'by_user_id', 'created_at'],
   Coupons: ['coupon_id', 'code', 'type', 'value', 'min_spend', 'max_discount', 'usage_limit', 'used_count', 'per_user_limit', 'start_at', 'end_at', 'is_active', 'created_at', 'updated_at', 'is_deleted'],
   Payments: ['payment_id', 'order_id', 'customer_name', 'phone', 'amount', 'method', 'slip_url', 'verified_by', 'verified_at', 'status', 'created_at', 'updated_at'],

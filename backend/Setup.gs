@@ -210,6 +210,42 @@ function migratePaymentsAddCustomerColumns() {
 }
 
 /**
+ * migrateOrderItemsAddCategory — เติมคอลัมน์ category_id ให้ชีต OrderItems (ผูกจาก product_id ไปยัง
+ * Products.category_id) สำหรับแถวเก่าที่สั่งซื้อไปแล้วก่อนเพิ่ม field นี้ในโค้ด (สินค้าที่ถูกลบไปแล้ว
+ * จะไม่มี category_id ย้อนหลังให้ เพราะไม่มีต้นทางให้ join) — ต้องรันหลัง repairSchema ครั้งเดียว
+ * (ปลอดภัย รันซ้ำได้เสมอ) วิธีใช้: เลือกฟังก์ชัน migrateOrderItemsAddCategory แล้วกด Run
+ */
+function migrateOrderItemsAddCategory() {
+  var ss = getSpreadsheet();
+  var sh = ss.getSheetByName('OrderItems');
+  if (!sh) return ok({ migrated: 0 }, 'ยังไม่มีชีต OrderItems');
+
+  var productById_ = {};
+  findAll('Products', null, true).forEach(function (p) { productById_[p.product_id] = p; });
+
+  var rows = findAll('OrderItems', null, true);
+  var headers = SHEET_SCHEMAS.OrderItems;
+  var filled = 0;
+  var matrix = rows.map(function (i) {
+    var product = productById_[i.product_id];
+    var categoryId = i.category_id || (product ? product.category_id : '') || '';
+    if (categoryId && !i.category_id) filled++;
+    return headers.map(function (h) {
+      if (h === 'category_id') return categoryId;
+      return i[h] !== undefined ? i[h] : '';
+    });
+  });
+
+  sh.clear();
+  sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sh.setFrozenRows(1);
+  sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#1f2937').setFontColor('#ffffff');
+  if (matrix.length) sh.getRange(2, 1, matrix.length, headers.length).setValues(matrix);
+  invalidateCache('OrderItems');
+  return ok({ migrated: matrix.length, filled: filled }, 'เติม category_id ให้ OrderItems แล้ว (' + filled + '/' + matrix.length + ' แถว มีสินค้าที่ join เจอ)');
+}
+
+/**
  * รันซ้ำได้ปลอดภัย: ล้างข้อมูลทั้งหมดแล้ว seed ใหม่ (ใช้ตอน dev/demo เท่านั้น — ห้ามรันบนข้อมูลจริง)
  */
 function resetAndReseedDemoData() {

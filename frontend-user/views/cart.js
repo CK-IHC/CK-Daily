@@ -28,6 +28,8 @@ Views.cart = function (container) {
         '<div id="itemsList"></div>' +
         '<div class="section-title">คูปองส่วนลด</div>' +
         '<div style="display:flex;gap:8px"><input id="couponInput" class="form-control" placeholder="รหัสคูปอง"><button id="applyCouponBtn" class="btn btn-outline btn-sm">ใช้</button></div>' +
+        '<div class="section-title">หมายเหตุถึงร้าน (ถ้ามี)</div>' +
+        '<textarea id="orderNoteInput" class="form-control" rows="2" maxlength="300" placeholder="เช่น ฝากไว้ที่ป้อมยาม, โทรก่อนส่ง">' + UI.escapeHtml(State.deliveryNote || '') + '</textarea>' +
         '<div class="section-title">สรุปยอด</div>' +
         '<div id="summaryBox" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px"></div>' +
         '<div id="issuesBox"></div>' +
@@ -40,6 +42,7 @@ Views.cart = function (container) {
       scheduleValidate();
     };
     document.getElementById('couponInput').value = State.couponCode || '';
+    document.getElementById('orderNoteInput').oninput = function (e) { State.deliveryNote = e.target.value; };
     document.getElementById('submitBtn').onclick = submitOrder;
 
     // ตรวจสต็อกทันทีตอนเปิดหน้า (ไม่หน่วง 400ms เหมือนตอนแก้ไขตะกร้า) กันช่วงเวลาสั้นๆ ที่ยังกด + ได้ก่อนรู้ว่าของหมด
@@ -175,11 +178,12 @@ Views.cart = function (container) {
       return Api.call('order.create', {
         items: State.cart.map(function (i) { return { product_id: i.product_id, qty: i.qty, options: i.options, note: i.note }; }),
         round_id: State.roundId, order_type: CART_ORDER_TYPE_,
-        coupon_code: State.couponCode, payment_method: CART_PAYMENT_METHOD_
+        coupon_code: State.couponCode, payment_method: CART_PAYMENT_METHOD_, delivery_note: State.deliveryNote
       });
     }).then(function (order) {
       if (!order) return;
       State.clearCart();
+      State.deliveryNote = '';
       UI.toast('สั่งซื้อสำเร็จ!', 'success');
       location.hash = '#/payment/' + order.order_id;
     }).catch(function (err) {

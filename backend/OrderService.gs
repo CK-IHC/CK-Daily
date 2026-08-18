@@ -70,7 +70,7 @@ function orderCreate(payload, token) {
     var order = {
       order_id: idPair.order_id, order_no: idPair.order_no, user_id: auth.user.user_id, phone: auth.user.phone,
       customer_name: auth.user.name || auth.user.phone, round_id: round.round_id, order_type: payload.order_type,
-      address: payload.order_type === 'delivery' ? String(payload.address) : '', delivery_note: String(payload.delivery_note || ''),
+      address: payload.order_type === 'delivery' ? String(payload.address) : '', delivery_note: String(payload.delivery_note || '').slice(0, 300),
       subtotal: totals.subtotal, discount: totals.discount, coupon_code: payload.coupon_code || '',
       delivery_fee: totals.delivery_fee, vat: totals.vat, grand_total: totals.grand_total,
       payment_method: paymentMethod, payment_status: isTransferLike ? 'pending_verify' : 'unpaid',
@@ -81,7 +81,7 @@ function orderCreate(payload, token) {
 
     var itemRows = totals.items.map(function (i) {
       return {
-        item_id: genId('ITM'), order_id: order.order_id, product_id: i.product_id, sku: i.sku || '', product_name: i.product_name,
+        item_id: genId('ITM'), order_id: order.order_id, product_id: i.product_id, category_id: i.category_id || '', sku: i.sku || '', product_name: i.product_name,
         options_json: i.options_json, unit_price: i.unit_price, qty: i.qty, line_total: i.line_total, note: i.note
       };
     });
@@ -443,12 +443,32 @@ function adminOrdersSummary(payload, token) {
     g.amount += numFrom(i.line_total);
   });
   var totalAmount = orders.reduce(function (s, o) { return s + numFrom(o.grand_total); }, 0);
+
+  // สรุปการแนบรูปออเดอร์/สลิปโอนเงิน (ใช้ตัวกรองเดียวกับด้านบน) — สำหรับการ์ดสรุปรูปแนบในแท็บ "สรุปยอด"
+  var withPhoto = 0, withSlip = 0;
+  var attachmentRows = orders.map(function (o) {
+    var slipUrls = parseSlipUrls_(o);
+    var hasPhoto = !!o.photo_url;
+    var hasSlip = slipUrls.length > 0;
+    if (hasPhoto) withPhoto++;
+    if (hasSlip) withSlip++;
+    return {
+      order_id: o.order_id, order_no: o.order_no, customer_name: o.customer_name, phone: normalizePhone_(o.phone),
+      placed_at: o.placed_at, has_photo: hasPhoto, photo_url: o.photo_url || '', slip_count: slipUrls.length, has_slip: hasSlip
+    };
+  }).sort(function (a, b) { return toDate(b.placed_at) - toDate(a.placed_at); });
+
   return ok({
     order_count: orders.length,
     total_amount: round2(totalAmount),
     by_product: Object.keys(byProduct).map(function (k) { return byProduct[k]; })
       .map(function (g) { g.amount = round2(g.amount); return g; })
-      .sort(function (a, b) { return b.qty - a.qty; })
+      .sort(function (a, b) { return b.qty - a.qty; }),
+    attachments_summary: {
+      with_photo: withPhoto, without_photo: orders.length - withPhoto,
+      with_slip: withSlip, without_slip: orders.length - withSlip,
+      orders: attachmentRows
+    }
   });
 }
 
