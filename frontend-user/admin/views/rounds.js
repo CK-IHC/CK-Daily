@@ -39,6 +39,7 @@ Views.rounds = function (container) {
         if (action === 'delete') doDelete(id);
       };
     });
+    UI.makeTableSortable(el.querySelector('table'));
   }
 
   function roundActions(r) {

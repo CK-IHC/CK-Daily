@@ -91,7 +91,7 @@ Views.products = function (container) {
     if (!products.length) { el.innerHTML = '<div class="empty-state">ยังไม่มีสินค้า</div>'; return; }
     el.innerHTML = '<div class="table-wrap"><table id="productsPrintTable"><thead><tr><th>SKU</th><th>ชื่อ</th><th>หมวดหมู่</th><th>ราคา</th><th>ต้นทุน</th><th>สต็อก</th><th>สถานะ</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
       products.map(function (p) {
-        return '<tr><td>' + p.sku + '</td><td>' + (p.is_frozen ? '❄️ ' : '') + UI.escapeHtml(p.name) + '</td><td>' + UI.escapeHtml(catName(p.category_id)) + '</td><td>' + UI.money(p.price) + '</td><td>' + UI.money(p.cost_price) + '</td>' +
+        return '<tr><td>' + p.sku + '</td><td>' + (p.is_frozen ? '<b>[แช่แข็ง]</b> ' : '') + UI.escapeHtml(p.name) + '</td><td>' + UI.escapeHtml(catName(p.category_id)) + '</td><td>' + UI.money(p.price) + '</td><td>' + UI.money(p.cost_price) + '</td>' +
           '<td>' + (p.track_stock ? p.stock_qty : '-') + '</td><td><span class="chip ' + (p.is_active ? 'active' : 'cancelled') + '">' + (p.is_active ? 'เปิดขาย' : 'ปิดขาย') + '</span></td>' +
           '<td class="no-print"><button class="btn btn-sm btn-outline" data-edit="' + p.product_id + '">แก้ไข</button> <button class="btn btn-sm btn-outline" data-opts="' + p.product_id + '">ตัวเลือก</button> <button class="btn btn-sm btn-outline" data-toggle="' + p.product_id + '">' + (p.is_active ? 'ปิดขาย' : 'เปิดขาย') + '</button> <button class="btn btn-sm btn-danger" data-del="' + p.product_id + '">' + Icon('trash', 13) + '</button></td></tr>';
       }).join('') + '</tbody></table></div>';
@@ -99,6 +99,7 @@ Views.products = function (container) {
     el.querySelectorAll('[data-opts]').forEach(function (b) { b.onclick = function () { openProductOptionsModal(products.filter(function (p) { return p.product_id === b.dataset.opts; })[0]); }; });
     el.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { if (confirm('ลบสินค้านี้?')) Api.call('admin.products.delete', { product_id: b.dataset.del }).then(function () { UI.toast('ลบแล้ว', 'success'); loadAll(); }).catch(function (err) { UI.toast(err.message, 'error'); }); }; });
     el.querySelectorAll('[data-toggle]').forEach(function (b) { b.onclick = function () { Api.call('admin.products.toggleActive', { product_id: b.dataset.toggle }).then(function () { UI.toast('อัปเดตแล้ว', 'success'); loadAll(); }); }; });
+    UI.makeTableSortable(el.querySelector('table'));
   }
 
   /**
@@ -250,6 +251,7 @@ Views.products = function (container) {
       }).join('') + '</tbody></table></div>';
     el.querySelectorAll('[data-edit-cat]').forEach(function (b) { b.onclick = function () { openCategoryModal(categories.filter(function (c) { return c.category_id === b.dataset.editCat; })[0]); }; });
     el.querySelectorAll('[data-del-cat]').forEach(function (b) { b.onclick = function () { if (confirm('ลบหมวดหมู่นี้?')) Api.call('admin.categories.delete', { category_id: b.dataset.delCat }).then(function () { UI.toast('ลบแล้ว', 'success'); loadAll(); }); }; });
+    UI.makeTableSortable(el.querySelector('table'));
   }
 
   function openCategoryModal(cat) {

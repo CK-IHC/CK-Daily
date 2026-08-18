@@ -191,7 +191,7 @@ function receiptPageHtml_(order) {
   var items = order.items || [];
   var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(order.order_id);
   var itemRows = items.map(function (i) {
-    return '<tr><td>' + UI.escapeHtml(i.product_name) + (i.is_frozen ? ' ❄️' : '') + '</td><td style="text-align:center">' + i.qty + '</td><td style="text-align:right">' + UI.money(i.line_total) + '</td></tr>';
+    return '<tr><td>' + UI.escapeHtml(i.product_name) + (i.is_frozen ? ' <b>[แช่แข็ง]</b>' : '') + (i.note ? '<br><span style="font-size:10px;color:#666">หมายเหตุ: ' + UI.escapeHtml(i.note) + '</span>' : '') + '</td><td style="text-align:center">' + i.qty + '</td><td style="text-align:right">' + UI.money(i.line_total) + '</td></tr>';
   }).join('');
   return '<div class="receipt">' +
     '<div class="head"><div><div class="brand">CK Daily</div><div class="sub">by IHC-Central Kitchen</div><div class="no">ใบเสร็จ #' + UI.escapeHtml(order.order_no) + '</div></div>' +
@@ -226,6 +226,67 @@ function receiptPagesWrap_(bodyHtml, count, extraStyle) {
     '<div class="print-doc-footer">' + printedByHtml_() + '</div>' +
     '<script>window.onload=function(){window.print();};<\/script>' +
     '</body></html>';
+}
+
+/**
+ * แปลงข้อมูลออเดอร์ (grouped, มี items[] ในตัว) ให้เป็น flat rows หนึ่งแถวต่อหนึ่งรายการสั่งซื้อ — ใช้ทั้งจอ
+ * "รายละเอียด" และตอนพิมพ์ ไม่ใช้ rowspan อีกต่อไป (ข้อมูลระดับออเดอร์ซ้ำในทุกแถวของออเดอร์นั้นแทน) กันปัญหา
+ * rowspan ตัดข้ามหน้าตอนพิมพ์แล้วเนื้อหาทับ footer + ทำให้เรียงลำดับคอลัมน์ไหนก็ได้โดยไม่ทำให้ตารางเพี้ยน
+ */
+function buildDetailRows_(orders) {
+  var rows = [];
+  orders.forEach(function (o) {
+    var lineItems = (o.items && o.items.length) ? o.items : [null];
+    lineItems.forEach(function (i) {
+      rows.push({
+        order_id: o.order_id, order_no: o.order_no, customer_name: o.customer_name, phone: o.phone,
+        phone_order_total: o.phone_order_total || 0, phone_order_seq: o.phone_order_seq || 0,
+        grand_total: o.grand_total, payment_status: o.payment_status, status: o.status, placed_at: o.placed_at,
+        product_name: i ? i.product_name : '-', qty: i ? i.qty : '', line_total: i ? i.line_total : '',
+        is_frozen: !!(i && i.is_frozen), note: i ? (i.note || '') : ''
+      });
+    });
+  });
+  return rows;
+}
+
+/**
+ * พิมพ์รายงาน "รายละเอียดออเดอร์" (แท็บ รายละเอียด) เป็นหน้าต่างพิมพ์แยกของตัวเอง (ไม่ใช้ UI.printWithHeader)
+ * ใช้ tfoot (display:table-footer-group) สำหรับบรรทัด "พิมพ์โดย" แทน position:fixed — tfoot เป็นกลไกมาตรฐาน
+ * ของเบราว์เซอร์สำหรับพิมพ์ซ้ำท้ายทุกหน้าที่ตารางไหลข้ามหน้า รับประกันว่าจะไม่ไหลไปทับเนื้อหาแถวข้อมูล
+ * (ต่างจาก position:fixed ที่พึ่งพาการเว้น margin เอาไว้เฉยๆ ซึ่งพลาดได้ถ้า rowspan/แถวสูงผิดปกติ)
+ */
+function printOrdersDetailReport_(rows) {
+  var win = window.open('', '_blank', 'width=900,height=800');
+  if (!win) { UI.toast('เบราว์เซอร์บล็อกป๊อปอัป กรุณาอนุญาตแล้วลองใหม่', 'error'); return; }
+  var orderIds = {}; rows.forEach(function (r) { orderIds[r.order_id] = true; });
+  var htmlRows = rows.map(function (r) {
+    return '<tr><td>#' + UI.escapeHtml(r.order_no) + '</td><td>' + UI.escapeHtml(r.customer_name) + '</td><td>' + r.phone + '</td>' +
+      '<td style="text-align:right">' + UI.money(r.grand_total) + '</td><td>' + r.payment_status + '</td><td>' + UI.statusLabel(r.status) + '</td>' +
+      '<td>' + UI.fmtTime(r.placed_at) + '</td>' +
+      '<td>' + UI.escapeHtml(r.product_name) + (r.is_frozen ? ' [แช่แข็ง]' : '') + (r.qty !== '' ? ' x' + r.qty : '') + '</td>' +
+      '<td>' + UI.escapeHtml(r.note || '-') + '</td></tr>';
+  }).join('');
+  var html = '<!DOCTYPE html><html><head><title>รายละเอียดออเดอร์</title><meta charset="utf-8">' +
+    '<style>@page{margin:14mm 12mm 15mm 12mm}' +
+    'body{font-family:Arial,sans-serif;padding:24px;color:#000}' +
+    '.print-doc-brand{line-height:1.3}.print-doc-brand b{font-size:17px}.print-doc-brand span{display:block;font-size:11px;color:#555}' +
+    '.print-doc-title{font-size:20px;margin:10px 0 4px}' +
+    '.print-doc-rule{border:none;border-top:2px solid #111;margin:10px 0 16px}' +
+    '.sub{color:#666;font-size:12px;margin-bottom:16px}' +
+    'table{width:100%;border-collapse:collapse;font-size:12px}th,td{border-bottom:1px solid #ddd;padding:5px 6px;text-align:left}' +
+    'th{background:#f3f4f6}tr{page-break-inside:avoid}thead{display:table-header-group}' +
+    'tfoot{display:table-footer-group;font-size:10px;color:#333}tfoot td{border-top:1px solid #999;border-bottom:none;padding-top:8px}' +
+    '</style></head><body>' +
+    '<div class="print-doc-brand"><b>CK Daily</b><span>by IHC-Central Kitchen</span></div>' +
+    '<h2 class="print-doc-title">รายละเอียดออเดอร์</h2>' +
+    '<hr class="print-doc-rule">' +
+    '<div class="sub">ทั้งหมด ' + Object.keys(orderIds).length + ' ออเดอร์ (' + rows.length + ' รายการสินค้า)</div>' +
+    '<table><thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>เบอร์</th><th style="text-align:right">ยอด</th><th>ชำระเงิน</th><th>สถานะ</th><th>เวลา</th><th>รายการสั่งซื้อ</th><th>หมายเหตุ</th></tr></thead>' +
+    '<tfoot><tr><td colspan="9">' + printedByHtml_() + '</td></tr></tfoot>' +
+    '<tbody>' + htmlRows + '</tbody></table>' +
+    '<script>window.onload=function(){window.print();};<\/script></body></html>';
+  win.document.open(); win.document.write(html); win.document.close();
 }
 
 /**
@@ -267,27 +328,30 @@ function printOrdersReport(items, total) {
   var win = window.open('', '_blank', 'width=700,height=800');
   if (!win) { UI.toast('เบราว์เซอร์บล็อกป๊อปอัป กรุณาอนุญาตแล้วลองใหม่', 'error'); return; }
   var rows = items.map(function (o) {
+    var itemNotes = (o.items || []).map(function (i) { return i.note; }).filter(Boolean).join('; ');
     return '<tr><td>#' + UI.escapeHtml(o.order_no) + '</td><td>' + UI.escapeHtml(o.customer_name) + '</td><td>' + UI.escapeHtml(o.phone) + '</td><td>' + UI.escapeHtml(o.department || '-') + '</td>' +
-      '<td style="text-align:right">' + UI.money(o.grand_total) + '</td><td>' + UI.statusLabel(o.status) + '</td><td>' + UI.escapeHtml(o.delivery_note || '-') + '</td></tr>';
+      '<td style="text-align:right">' + UI.money(o.grand_total) + '</td><td>' + UI.statusLabel(o.status) + '</td><td>' + UI.escapeHtml(itemNotes || '-') + '</td></tr>';
   }).join('');
   var sum = items.reduce(function (s, o) { return s + Number(o.grand_total || 0); }, 0);
   var html = '<!DOCTYPE html><html><head><title>รายงานออเดอร์</title><meta charset="utf-8">' +
-    '<style>@page{margin:14mm 12mm 26mm 12mm}' +
-    'body{font-family:Arial,sans-serif;padding:24px 24px 46px;color:#000}' +
+    '<style>@page{margin:14mm 12mm 15mm 12mm}' +
+    'body{font-family:Arial,sans-serif;padding:24px;color:#000}' +
     '.print-doc-brand{line-height:1.3}.print-doc-brand b{font-size:17px}.print-doc-brand span{display:block;font-size:11px;color:#555}' +
     '.print-doc-title{font-size:20px;margin:10px 0 4px}' +
     '.print-doc-rule{border:none;border-top:2px solid #111;margin:10px 0 16px}' +
-    '.print-doc-footer{font-size:10px;color:#333;position:fixed;bottom:8mm;left:12mm}' +
     '.sub{color:#666;font-size:12px;margin-bottom:16px}' +
     'table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left}' +
-    'th{background:#f3f4f6}tfoot td{font-weight:800;border-top:2px solid #333}tr{page-break-inside:avoid}thead{display:table-header-group}</style></head><body>' +
+    'th{background:#f3f4f6}tr{page-break-inside:avoid}thead{display:table-header-group}' +
+    'tfoot{display:table-footer-group}tfoot .totalRow td{font-weight:800;border-top:2px solid #333}' +
+    'tfoot .printedRow td{border-top:none;border-bottom:none;padding-top:8px;font-size:10px;color:#333;font-weight:400}</style></head><body>' +
     '<div class="print-doc-brand"><b>CK Daily</b><span>by IHC-Central Kitchen</span></div>' +
     '<h2 class="print-doc-title">รายงานออเดอร์</h2>' +
     '<hr class="print-doc-rule">' +
     '<div class="sub">ทั้งหมด ' + total + ' รายการ (แสดง ' + items.length + ' รายการในหน้านี้)</div>' +
-    '<table><thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>เบอร์</th><th>แผนก</th><th style="text-align:right">ยอด</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead><tbody>' + rows + '</tbody>' +
-    '<tfoot><tr><td colspan="4">รวม</td><td style="text-align:right">' + UI.money(sum) + '</td><td></td><td></td></tr></tfoot></table>' +
-    '<div class="print-doc-footer">' + printedByHtml_() + '</div>' +
+    '<table><thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>เบอร์</th><th>แผนก</th><th style="text-align:right">ยอด</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead>' +
+    '<tfoot><tr class="totalRow"><td colspan="4">รวม</td><td style="text-align:right">' + UI.money(sum) + '</td><td></td><td></td></tr>' +
+    '<tr class="printedRow"><td colspan="7">' + printedByHtml_() + '</td></tr></tfoot>' +
+    '<tbody>' + rows + '</tbody></table>' +
     '<script>window.onload=function(){window.print();};<\/script></body></html>';
   win.document.open(); win.document.write(html); win.document.close();
 }
@@ -437,6 +501,9 @@ function showScanResultModal(order, onDone) {
 Views.orders = function (container) {
   var filters = { status: '', payment_status: '', phone: '', round_id: '' };
   var page = 1, lastData = null, tab = 'list', rounds = [];
+  var detailRows = [], detailSortKey = null, detailSortDir = 'asc';
+  var summarySortKey = null, summarySortDir = 'asc';
+  var listSortKey = null, listSortDir = 'asc';
 
   container.innerHTML =
     '<div class="card">' +
@@ -450,6 +517,7 @@ Views.orders = function (container) {
         '<button id="btnScan" class="btn btn-outline">📷 สแกน QR</button>' +
         '<button id="btnReceipts" class="btn btn-outline">🧾 พิมพ์ใบเสร็จ</button>' +
         '<button id="btnExport" class="btn btn-outline">Export CSV</button>' +
+        '<button id="btnExportItems" class="btn btn-outline" title="ดึงข้อมูลดิบจากชีต OrderItems (รวม category_id/order_no) — เปิดด้วย Excel ได้">Export Excel (OrderItems)</button>' +
         '<button id="btnPrintReport" class="btn btn-outline">🖨️ พิมพ์รายงาน</button>' +
       '</div>' +
       '<div id="tableArea">' + UI.loading() + '</div>' +
@@ -482,12 +550,25 @@ Views.orders = function (container) {
       return { order_no: o.order_no, customer: o.customer_name, phone: o.phone, status: o.status, payment_status: o.payment_status, grand_total: o.grand_total, placed_at: o.placed_at };
     }));
   };
+  document.getElementById('btnExportItems').onclick = function () {
+    var btn = document.getElementById('btnExportItems');
+    var payload = Object.assign({}, filters);
+    Object.keys(payload).forEach(function (k) { if (payload[k] === '') delete payload[k]; });
+    btn.disabled = true; btn.textContent = 'กำลังดึงข้อมูล...';
+    Api.call('admin.orderItems.export', payload).then(function (rows) {
+      btn.disabled = false; btn.textContent = 'Export Excel (OrderItems)';
+      UI.exportCsv('order-items.csv', rows);
+    }).catch(function (err) {
+      btn.disabled = false; btn.textContent = 'Export Excel (OrderItems)';
+      UI.toast(err.message, 'error');
+    });
+  };
   document.getElementById('btnPrintReport').onclick = function () {
     if (!lastData) return;
     // พิมพ์ตามแท็บที่กำลังเปิดดูอยู่จริง ไม่ใช่ข้อมูลค้างจากแท็บอื่นที่เคยโหลดไว้ก่อนหน้า
     if (tab === 'list') { printOrdersReport(lastData.items, lastData.total); return; }
-    var titles = { detail: 'รายละเอียดออเดอร์', summary: 'สรุปยอดขาย' };
-    UI.printWithHeader(titles[tab] || 'รายงานออเดอร์', document.getElementById('tableArea'));
+    if (tab === 'detail') { printOrdersDetailReport_(detailRows); return; }
+    UI.printWithHeader('สรุปยอดขาย', document.getElementById('tableArea'));
   };
   document.getElementById('btnScan').onclick = function () {
     openScanModal(function (order) { showScanResultModal(order, load); });
@@ -536,54 +617,60 @@ Views.orders = function (container) {
     Api.call('admin.orders.summary', payload).then(renderSummary).catch(function (err) { UI.toast(err.message, 'error'); });
   }
 
-  /** โหลดออเดอร์ทั้งหมดที่ตรงตัวกรอง (ไม่แบ่งหน้า) แล้วจัดกลุ่มเรียงตามเบอร์โทร — ใช้กับแท็บ "รายละเอียด" */
+  /** โหลดออเดอร์ทั้งหมดที่ตรงตัวกรอง (ไม่แบ่งหน้า) แล้วแตกเป็น flat rows หนึ่งแถวต่อหนึ่งรายการสั่งซื้อ — ใช้กับแท็บ "รายละเอียด" */
   function loadDetail() {
     var payload = Object.assign({ page: 1, page_size: 1000 }, filters);
     Object.keys(payload).forEach(function (k) { if (payload[k] === '') delete payload[k]; });
     Api.call('admin.orders.list', payload).then(function (data) {
-      var sorted = data.items.slice().sort(function (a, b) {
+      var sortedOrders = data.items.slice().sort(function (a, b) {
         if (a.phone !== b.phone) return a.phone < b.phone ? -1 : 1;
         return new Date(a.placed_at) - new Date(b.placed_at);
       });
-      lastData = Object.assign({}, data, { items: sorted });
-      renderDetail(lastData);
+      lastData = Object.assign({}, data, { items: sortedOrders });
+      detailRows = buildDetailRows_(sortedOrders);
+      detailSortKey = null; detailSortDir = 'asc';
+      renderDetail(detailRows);
     }).catch(function (err) { UI.toast(err.message, 'error'); });
   }
 
-  /** ออเดอร์หนึ่งใบ ขยายเป็นหลายแถว — หนึ่งแถวต่อหนึ่งรายการสั่งซื้อ (คอลัมน์ระดับออเดอร์ใช้ rowspan ครอบทุกแถวของออเดอร์นั้น) */
-  function renderDetail(data) {
+  /**
+   * ออเดอร์หนึ่งใบ ขยายเป็นหลายแถวเต็ม (ไม่ใช้ rowspan อีกต่อไป — ข้อมูลระดับออเดอร์ซ้ำทุกแถวของออเดอร์นั้น)
+   * เพื่อให้เรียงลำดับคอลัมน์ได้อิสระ และกันปัญหา rowspan ตัดข้ามหน้าตอนพิมพ์แล้วเนื้อหาทับ footer
+   */
+  function renderDetail(rows) {
     var el = document.getElementById('tableArea');
     if (!el) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
-    if (!data.items.length) { el.innerHTML = '<div class="empty-state">ไม่พบออเดอร์</div>'; return; }
-    var bodyHtml = '';
-    data.items.forEach(function (o, idx) {
-      var newGroup = idx === 0 || data.items[idx - 1].phone !== o.phone;
-      var repeatBadge = o.phone_order_total > 1 ? ' <span class="chip" style="background:#eef2ff;color:#4338ca" title="ลูกค้าเบอร์นี้สั่งมาแล้ว ' + o.phone_order_total + ' ครั้ง">ครั้งที่ ' + o.phone_order_seq + '/' + o.phone_order_total + '</span>' : '';
-      var lineItems = o.items && o.items.length ? o.items : [null];
-      var rowspan = lineItems.length;
-      var orderCellsHtml =
-        '<td rowspan="' + rowspan + '"><a href="javascript:void(0)" class="detailLink" data-id="' + o.order_id + '">#' + o.order_no + '</a></td>' +
-        '<td rowspan="' + rowspan + '">' + UI.escapeHtml(o.customer_name) + '</td>' +
-        '<td rowspan="' + rowspan + '">' + o.phone + repeatBadge + '</td>' +
-        '<td rowspan="' + rowspan + '">' + UI.money(o.grand_total) + '</td>' +
-        '<td rowspan="' + rowspan + '"><span class="chip ' + o.payment_status + '">' + o.payment_status + '</span></td>' +
-        '<td rowspan="' + rowspan + '"><span class="chip ' + o.status + '">' + UI.statusLabel(o.status) + '</span></td>' +
-        '<td rowspan="' + rowspan + '">' + UI.fmtTime(o.placed_at) + '</td>' +
-        '<td rowspan="' + rowspan + '" style="font-size:12px">' + UI.escapeHtml(o.delivery_note || '-') + '</td>';
-      var manageCellHtml = '<td rowspan="' + rowspan + '" class="no-print"><button class="btn btn-outline btn-sm manageBtn" data-id="' + o.order_id + '">จัดการ</button></td>';
-      lineItems.forEach(function (i, itemIdx) {
-        var itemCell = i
-          ? '<td style="font-size:12px">' + UI.escapeHtml(i.product_name) + (i.is_frozen ? ' ❄️' : '') + ' x' + i.qty + ' <span style="color:var(--text-muted)">(' + UI.money(i.line_total) + ')</span></td>'
-          : '<td style="font-size:12px;color:var(--text-muted)">-</td>';
-        var trStyle = (newGroup && itemIdx === 0) ? ' style="border-top:2px solid var(--border)"' : '';
-        bodyHtml += '<tr' + trStyle + '>' + (itemIdx === 0 ? orderCellsHtml : '') + itemCell + (itemIdx === 0 ? manageCellHtml : '') + '</tr>';
-      });
-    });
-    el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>เบอร์</th><th>ยอด</th><th>ชำระเงิน</th><th>สถานะ</th><th>เวลา</th><th>หมายเหตุ</th><th>รายการสั่งซื้อ</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
-      bodyHtml + '</tbody></table></div>' +
-      '<div style="margin-top:10px;font-size:12px;color:var(--text-muted)">ทั้งหมด ' + data.total + ' รายการ</div>';
+    if (!rows.length) { el.innerHTML = '<div class="empty-state">ไม่พบออเดอร์</div>'; return; }
+    var orderIds = {}; rows.forEach(function (r) { orderIds[r.order_id] = true; });
+    var bodyHtml = rows.map(function (r) {
+      var repeatBadge = r.phone_order_total > 1 ? ' <span class="chip" style="background:#eef2ff;color:#4338ca" title="ลูกค้าเบอร์นี้สั่งมาแล้ว ' + r.phone_order_total + ' ครั้ง">ครั้งที่ ' + r.phone_order_seq + '/' + r.phone_order_total + '</span>' : '';
+      return '<tr>' +
+        '<td><a href="javascript:void(0)" class="detailLink" data-id="' + r.order_id + '">#' + r.order_no + '</a></td>' +
+        '<td>' + UI.escapeHtml(r.customer_name) + '</td>' +
+        '<td>' + r.phone + repeatBadge + '</td>' +
+        '<td>' + UI.money(r.grand_total) + '</td>' +
+        '<td><span class="chip ' + r.payment_status + '">' + r.payment_status + '</span></td>' +
+        '<td><span class="chip ' + r.status + '">' + UI.statusLabel(r.status) + '</span></td>' +
+        '<td>' + UI.fmtTime(r.placed_at) + '</td>' +
+        '<td style="font-size:12px">' + UI.escapeHtml(r.product_name) + (r.is_frozen ? ' <b>[แช่แข็ง]</b>' : '') + (r.qty !== '' ? ' x' + r.qty + ' <span style="color:var(--text-muted)">(' + UI.money(r.line_total) + ')</span>' : '') + '</td>' +
+        '<td style="font-size:12px">' + UI.escapeHtml(r.note || '-') + '</td>' +
+        '<td class="no-print"><button class="btn btn-outline btn-sm manageBtn" data-id="' + r.order_id + '">จัดการ</button></td>' +
+      '</tr>';
+    }).join('');
+    el.innerHTML = '<div class="table-wrap"><table><thead><tr>' +
+      '<th data-key="order_no">เลขที่</th><th data-key="customer_name">ลูกค้า</th><th data-key="phone">เบอร์</th>' +
+      '<th data-key="grand_total">ยอด</th><th data-key="payment_status">ชำระเงิน</th><th data-key="status">สถานะ</th>' +
+      '<th data-key="placed_at">เวลา</th><th data-key="product_name">รายการสั่งซื้อ</th><th data-key="note">หมายเหตุ</th>' +
+      '<th class="no-print">จัดการ</th></tr></thead><tbody>' + bodyHtml + '</tbody></table></div>' +
+      '<div style="margin-top:10px;font-size:12px;color:var(--text-muted)">ทั้งหมด ' + Object.keys(orderIds).length + ' ออเดอร์ (' + rows.length + ' รายการสินค้า)</div>';
     el.querySelectorAll('.detailLink').forEach(function (b) { b.onclick = function () { openOrderDetailModal(b.dataset.id, load); }; });
     el.querySelectorAll('.manageBtn').forEach(function (b) { b.onclick = function () { openOrderDetailModal(b.dataset.id, load); }; });
+    UI.wireSortHeaders(el.querySelector('thead'), function (key) {
+      detailSortDir = (detailSortKey === key && detailSortDir === 'asc') ? 'desc' : 'asc';
+      detailSortKey = key;
+      detailRows = UI.sortRows(detailRows, key, detailSortDir);
+      renderDetail(detailRows);
+    });
   }
 
   function renderSummary(data) {
@@ -592,20 +679,28 @@ Views.orders = function (container) {
     el.innerHTML = '<div class="kpi-grid"><div class="kpi-card"><div class="label">จำนวนออเดอร์</div><div class="value">' + data.order_count + '</div></div>' +
       '<div class="kpi-card"><div class="label">ยอดขายรวม</div><div class="value">' + UI.money(data.total_amount) + '</div></div></div>' +
       (data.by_product.length
-        ? '<div class="table-wrap"><table><thead><tr><th>รหัส SKU</th><th>สินค้า</th><th>จำนวน</th><th>คงเหลือในสต็อก</th><th>ยอดเงิน</th></tr></thead><tbody>' +
+        ? '<div class="table-wrap"><table><thead><tr><th data-key="sku">รหัส SKU</th><th data-key="product_name">สินค้า</th><th data-key="qty">จำนวน</th><th data-key="stock_qty">คงเหลือในสต็อก</th><th data-key="amount">ยอดเงิน</th></tr></thead><tbody>' +
           data.by_product.map(function (p) {
             return '<tr><td>' + UI.escapeHtml(p.sku || '-') + '</td><td>' + UI.escapeHtml(p.product_name) + '</td><td>' + p.qty + '</td>' +
               '<td>' + (p.stock_qty === null || p.stock_qty === undefined ? '-' : p.stock_qty) + '</td><td>' + UI.money(p.amount) + '</td></tr>';
           }).join('') +
           '</tbody></table></div>'
         : '<div class="empty-state">ไม่มีข้อมูลตามตัวกรองนี้</div>');
+    if (data.by_product.length) {
+      UI.wireSortHeaders(document.querySelector('#tableArea thead'), function (key) {
+        summarySortDir = (summarySortKey === key && summarySortDir === 'asc') ? 'desc' : 'asc';
+        summarySortKey = key;
+        data.by_product = UI.sortRows(data.by_product, key, summarySortDir);
+        renderSummary(data);
+      });
+    }
   }
 
   function renderTable(data) {
     var el = document.getElementById('tableArea');
     if (!el) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
     if (!data.items.length) { el.innerHTML = '<div class="empty-state">ไม่พบออเดอร์</div>'; return; }
-    el.innerHTML = '<div class="table-wrap"><table><thead><tr><th></th><th>เลขที่</th><th>ลูกค้า</th><th>เบอร์</th><th>ยอด</th><th>ชำระเงิน</th><th>สถานะ</th><th>เวลา</th><th>จัดการ</th></tr></thead><tbody>' +
+    el.innerHTML = '<div class="table-wrap"><table><thead><tr><th></th><th data-key="order_no">เลขที่</th><th data-key="customer_name">ลูกค้า</th><th data-key="phone">เบอร์</th><th data-key="grand_total">ยอด</th><th data-key="payment_status">ชำระเงิน</th><th data-key="status">สถานะ</th><th data-key="placed_at">เวลา</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
       data.items.map(function (o) {
         var nextOptions = (ORDER_NEXT_STATUS_[o.status] || []).map(function (s) { return '<option value="' + s + '">' + UI.statusLabel(s) + '</option>'; }).join('');
         var repeatBadge = o.phone_order_total > 1 ? ' <span class="chip" style="background:#eef2ff;color:#4338ca" title="ลูกค้าเบอร์นี้สั่งมาแล้ว ' + o.phone_order_total + ' ครั้ง">ครั้งที่ ' + o.phone_order_seq + '/' + o.phone_order_total + '</span>' : '';
@@ -648,6 +743,13 @@ Views.orders = function (container) {
     var prevBtn = document.getElementById('prevPage'), nextBtn = document.getElementById('nextPage');
     if (prevBtn) prevBtn.onclick = function () { if (page > 1) { page--; load(); } };
     if (nextBtn) nextBtn.onclick = function () { if (page * 30 < data.total) { page++; load(); } };
+    // เรียงลำดับเฉพาะรายการในหน้าปัจจุบัน (30 รายการ/หน้า) — เปลี่ยนหน้า/กรองใหม่จะรีเซ็ตกลับเป็นเรียงตามเวลาล่าสุดตามปกติ
+    UI.wireSortHeaders(el.querySelector('thead'), function (key) {
+      listSortDir = (listSortKey === key && listSortDir === 'asc') ? 'desc' : 'asc';
+      listSortKey = key;
+      data.items = UI.sortRows(data.items, key, listSortDir);
+      renderTable(data);
+    });
   }
 
   load();

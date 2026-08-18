@@ -107,6 +107,7 @@ Views.users = function (container) {
         Api.call('admin.users.delete', { user_id: b.dataset.del }).then(function () { UI.toast('ลบแล้ว', 'success'); load(); }).catch(function (err) { UI.toast(err.message, 'error'); });
       };
     });
+    UI.makeTableSortable(el.querySelector('table'));
   }
 
   load();

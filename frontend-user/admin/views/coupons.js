@@ -21,6 +21,7 @@ Views.coupons = function (container) {
       }).join('') + '</tbody></table></div>';
     el.querySelectorAll('[data-edit]').forEach(function (b) { b.onclick = function () { openModal(coupons.filter(function (c) { return c.coupon_id === b.dataset.edit; })[0]); }; });
     el.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { if (confirm('ลบคูปองนี้?')) Api.call('admin.coupons.delete', { coupon_id: b.dataset.del }).then(function () { UI.toast('ลบแล้ว', 'success'); load(); }); }; });
+    UI.makeTableSortable(el.querySelector('table'));
   }
 
   function openModal(c) {

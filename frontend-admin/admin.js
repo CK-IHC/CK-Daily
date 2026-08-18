@@ -42,6 +42,64 @@ var UI = (function () {
   function statusLabel(s) {
     return { pending: 'รอดำเนินการ', in_progress: 'กำลังดำเนินการ', completed: 'สำเร็จ', cancelled: 'ยกเลิก' }[s] || s;
   }
+  /** เรียงลำดับ rows ตาม key — ตัวเลข (รวมค่าที่เป็น string ตัวเลขล้วน) เทียบเชิงตัวเลข ที่เหลือเทียบแบบ string (locale ไทย) */
+  function sortRows(rows, key, dir) {
+    var copy = (rows || []).slice();
+    copy.sort(function (a, b) {
+      var av = a ? a[key] : '', bv = b ? b[key] : '';
+      if (av == null) av = ''; if (bv == null) bv = '';
+      var na = Number(av), nb = Number(bv);
+      var bothNumeric = av !== '' && bv !== '' && !isNaN(na) && !isNaN(nb);
+      var cmp = bothNumeric ? (na - nb) : String(av).localeCompare(String(bv), 'th');
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    return copy;
+  }
+  /**
+   * ผูก event คลิกหัวตาราง (th[data-key]) ให้เรียงลำดับได้ — เรียกใหม่ทุกครั้งหลัง render ตาราง (thead เป็น
+   * element ใหม่ทุกครั้งที่ render ใหม่ จึงไม่เก็บ state ทิศทางเรียงไว้ที่ DOM ตรงนี้ — ฝั่งที่เรียกใช้เก็บ
+   * sortKey/sortDir ไว้เองใน closure แล้วสลับทิศทางก่อนเรียก UI.sortRows แล้ว render() ใหม่)
+   * onClick(key) ถูกเรียกด้วย key ของคอลัมน์ที่คลิก
+   */
+  function wireSortHeaders(theadEl, onClick) {
+    if (!theadEl) return;
+    theadEl.querySelectorAll('th[data-key]').forEach(function (th) {
+      th.classList.add('sortable-th');
+      th.onclick = function () { onClick(th.dataset.key); };
+    });
+  }
+  /**
+   * ทำให้ตารางเรียงลำดับได้โดยตรงจาก DOM (ไม่ต้องมีสำเนา array ต้นทางแยกไว้ใน closure) — คลิกหัวตารางแล้ว
+   * ย้าย <tr> ใน <tbody> ใหม่ตามข้อความในคอลัมน์นั้น (เทียบเป็นตัวเลขถ้าทั้งคู่เป็นตัวเลข/เงิน/% ล้วน ไม่งั้น
+   * เทียบแบบข้อความ) ย้าย DOM node เดิม ไม่ได้สร้างใหม่ จึง event listener ที่ผูกไว้ก่อนหน้ายังทำงานปกติ
+   * ใช้กับตารางที่ build จาก helper กลาง (เช่น reports.js table()/rankTable_()) ได้ทันทีโดยไม่ต้องแก้ data flow
+   */
+  function makeTableSortable(tableEl) {
+    if (!tableEl) return;
+    var thead = tableEl.querySelector('thead'), tbody = tableEl.querySelector('tbody');
+    if (!thead || !tbody) return;
+    var ths = thead.querySelectorAll('th');
+    ths.forEach(function (th, colIdx) {
+      th.classList.add('sortable-th');
+      th.onclick = function () {
+        var dir = th.dataset.dir === 'asc' ? 'desc' : 'asc';
+        ths.forEach(function (t) { t.removeAttribute('data-dir'); });
+        th.dataset.dir = dir;
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+        rows.sort(function (a, b) {
+          var ca = a.children[colIdx], cb = b.children[colIdx];
+          var av = ca ? ca.textContent.trim() : '', bv = cb ? cb.textContent.trim() : '';
+          var numericLike = /^[฿\s0-9,.\-%]+$/;
+          var bothNumeric = av !== '' && bv !== '' && numericLike.test(av) && numericLike.test(bv);
+          var cmp = bothNumeric
+            ? (Number(av.replace(/[^0-9.\-]/g, '')) - Number(bv.replace(/[^0-9.\-]/g, '')))
+            : av.localeCompare(bv, 'th');
+          return dir === 'asc' ? cmp : -cmp;
+        });
+        rows.forEach(function (r) { tbody.appendChild(r); });
+      };
+    });
+  }
   function printedByLine_() {
     var admin = State.user ? (State.user.name || State.user.phone) : '-';
     var now = new Date().toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -106,7 +164,7 @@ var UI = (function () {
     window.print();
     setTimeout(cleanup, 5000); // เผื่อเบราว์เซอร์ไม่ยิง afterprint (บาง browser/บาง OS)
   }
-  return { toast: toast, money: money, loading: loading, fmtTime: fmtTime, escapeHtml: escapeHtml, exportCsv: exportCsv, modal: modal, statusLabel: statusLabel, printHeaderHtml: printHeaderHtml, printFooterHtml: printFooterHtml, printWithHeader: printWithHeader };
+  return { toast: toast, money: money, loading: loading, fmtTime: fmtTime, escapeHtml: escapeHtml, exportCsv: exportCsv, modal: modal, statusLabel: statusLabel, printHeaderHtml: printHeaderHtml, printFooterHtml: printFooterHtml, printWithHeader: printWithHeader, sortRows: sortRows, wireSortHeaders: wireSortHeaders, makeTableSortable: makeTableSortable };
 })();
 
 var Views = {};

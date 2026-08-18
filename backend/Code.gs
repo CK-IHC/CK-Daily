@@ -55,6 +55,7 @@ var ROUTES = {
   'admin.orders.delete': function (p, t) { return adminOrdersDelete(p, t); },
   'admin.orders.summary': function (p, t) { return adminOrdersSummary(p, t); },
   'admin.orders.findByOrderNo': function (p, t) { return adminOrdersFindByOrderNo(p, t); },
+  'admin.orderItems.export': function (p, t) { return adminOrderItemsExport(p, t); },
 
   'admin.rounds.list': function (p, t) { return adminRoundsList(p, t); },
   'admin.rounds.create': function (p, t) { return adminRoundsCreate(p, t); },

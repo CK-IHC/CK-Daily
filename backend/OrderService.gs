@@ -81,7 +81,7 @@ function orderCreate(payload, token) {
 
     var itemRows = totals.items.map(function (i) {
       return {
-        item_id: genId('ITM'), order_id: order.order_id, product_id: i.product_id, category_id: i.category_id || '', sku: i.sku || '', product_name: i.product_name,
+        item_id: genId('ITM'), order_id: order.order_id, order_no: order.order_no, product_id: i.product_id, category_id: i.category_id || '', sku: i.sku || '', product_name: i.product_name,
         options_json: i.options_json, unit_price: i.unit_price, qty: i.qty, line_total: i.line_total, note: i.note
       };
     });
@@ -385,7 +385,7 @@ function adminOrdersList(payload, token) {
     if (frozenIds[i.product_id]) frozenByOrder[i.order_id] = true;
     (itemsByOrder[i.order_id] = itemsByOrder[i.order_id] || []).push({
       product_id: i.product_id, product_name: i.product_name, qty: numFrom(i.qty),
-      unit_price: numFrom(i.unit_price), line_total: numFrom(i.line_total), is_frozen: !!frozenIds[i.product_id]
+      unit_price: numFrom(i.unit_price), line_total: numFrom(i.line_total), is_frozen: !!frozenIds[i.product_id], note: i.note || ''
     });
   });
 
@@ -450,6 +450,25 @@ function adminOrdersSummary(payload, token) {
       .map(function (g) { g.amount = round2(g.amount); return g; })
       .sort(function (a, b) { return b.qty - a.qty; })
   });
+}
+
+/** Export ดิบจากชีต OrderItems (สำหรับปุ่ม "Export Excel" ในหน้าออเดอร์ทั้งหมด) — กรองด้วยตัวกรองเดียวกับ
+ * admin.orders.list/summary (ผ่าน Orders ก่อน แล้วดึงเฉพาะ OrderItems ของออเดอร์ที่ตรงเงื่อนไข) รวม order_no/
+ * category_id ที่เพิ่งเพิ่มเข้าไปในชีตด้วย — เปิดด้วย Excel ได้ตรงๆ ผ่าน UI.exportCsv ฝั่ง frontend */
+function adminOrderItemsExport(payload, token) {
+  requireRole(token, ['staff', 'manager', 'admin']);
+  payload = payload || {};
+  var orders = findAll('Orders', function (o) { return orderMatchesFilters_(o, payload); });
+  var orderIds = {}; orders.forEach(function (o) { orderIds[o.order_id] = true; });
+  var items = findAll('OrderItems', function (i) { return orderIds[i.order_id]; })
+    .sort(function (a, b) { return toDate(b.created_at) - toDate(a.created_at); });
+  return ok(items.map(function (i) {
+    return {
+      order_no: i.order_no || '', order_id: i.order_id, category_id: i.category_id || '', sku: i.sku || '',
+      product_name: i.product_name, qty: numFrom(i.qty), unit_price: numFrom(i.unit_price), line_total: numFrom(i.line_total),
+      note: i.note || '', created_at: i.created_at
+    };
+  }));
 }
 
 function adminOrdersUpdateStatus(payload, token) {

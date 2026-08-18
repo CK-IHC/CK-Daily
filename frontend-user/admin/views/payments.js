@@ -75,6 +75,7 @@ Views.payments = function (container) {
     el.querySelectorAll('[data-reject]').forEach(function (b) { b.onclick = function () { verify(b.dataset.reject, false); }; });
     el.querySelectorAll('[data-refund]').forEach(function (b) { b.onclick = function () { refund(b.dataset.refund); }; });
     el.querySelectorAll('[data-ocr]').forEach(function (b) { b.onclick = function () { analyzeSlip(b.dataset.ocr, b); }; });
+    UI.makeTableSortable(el.querySelector('table'));
   }
 
   function analyzeSlip(orderId, btn) {

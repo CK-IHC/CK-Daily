@@ -80,6 +80,7 @@ Views.stock = function (container) {
           '<button class="btn btn-sm btn-danger" data-action="waste" data-id="' + r.product_id + '" data-name="' + UI.escapeHtml(r.name) + '">ตัดของเสีย</button></td></tr>';
       }).join('') + '</tbody></table></div>';
     el.querySelectorAll('[data-action]').forEach(function (btn) { btn.onclick = function () { openAdjustModal(btn.dataset.action, btn.dataset.id, btn.dataset.name); }; });
+    UI.makeTableSortable(el.querySelector('table'));
   }
 
   function openAdjustModal(type, productId, name) {
@@ -116,6 +117,7 @@ Views.stock = function (container) {
       if (!data.items.length) { el.innerHTML = '<div class="empty-state">ยังไม่มีประวัติ</div>'; return; }
       el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>วันที่</th><th>สินค้า</th><th>ประเภท</th><th>เปลี่ยนแปลง</th><th>ก่อน→หลัง</th><th>อ้างอิง</th><th>หมายเหตุ</th></tr></thead><tbody>' +
         data.items.map(function (m) { return '<tr><td>' + UI.fmtTime(m.created_at) + '</td><td>' + m.product_id + '</td><td>' + m.type + '</td><td>' + m.qty_change + '</td><td>' + m.qty_before + ' → ' + m.qty_after + '</td><td>' + (m.ref_type || '') + ' ' + (m.ref_id || '') + '</td><td>' + UI.escapeHtml(m.reason || '') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+      UI.makeTableSortable(el.querySelector('table'));
     }).catch(function (err) { UI.toast(err.message, 'error'); });
   }
 

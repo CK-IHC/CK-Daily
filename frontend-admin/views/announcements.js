@@ -33,6 +33,7 @@ Views.announcements = function (container) {
         Api.call('admin.announcements.delete', { announcement_id: b.dataset.del }).then(function () { UI.toast('ลบแล้ว', 'success'); load(); }).catch(function (err) { UI.toast(err.message, 'error'); });
       };
     });
+    UI.makeTableSortable(el.querySelector('table'));
   }
 
   function openModal(a) {

@@ -100,6 +100,7 @@ Views.reports = function (container) {
       Charts.bar('topRevChart', top.by_revenue.map(function (p) { return p.product_name; }), [{ label: 'รายได้', data: top.by_revenue.map(function (p) { return p.revenue; }) }], true);
       document.getElementById('expTopQty').onclick = function () { UI.exportCsv('top-products-by-qty.csv', top.by_qty.map(function (p, i) { return { rank: i + 1, product_name: p.product_name, qty: p.qty }; })); };
       document.getElementById('expTopRev').onclick = function () { UI.exportCsv('top-products-by-revenue.csv', top.by_revenue.map(function (p, i) { return { rank: i + 1, product_name: p.product_name, revenue: p.revenue }; })); };
+      area.querySelectorAll('table').forEach(UI.makeTableSortable);
     });
   }
 
@@ -109,6 +110,7 @@ Views.reports = function (container) {
         '<canvas id="roundChart" height="90"></canvas>' + table(rows, ['round_name', 'status', 'orders', 'sales']) + '</div>';
       Charts.bar('roundChart', rows.map(function (x) { return x.round_name; }), [{ label: 'ยอดขาย', data: rows.map(function (x) { return x.sales; }) }]);
       document.getElementById('exp').onclick = function () { UI.exportCsv('sales-by-round.csv', rows); };
+      area.querySelectorAll('table').forEach(UI.makeTableSortable);
     });
   }
 
@@ -120,6 +122,7 @@ Views.reports = function (container) {
         '<div class="kpi-card"><div class="label">กำไรขั้นต้น</div><div class="value">' + UI.money(d.gross_profit) + '</div></div></div>' +
         table(d.by_product, ['product_name', 'revenue', 'cogs', 'gross_profit', 'margin_pct']) + '</div>';
       document.getElementById('exp').onclick = function () { UI.exportCsv('profit-loss.csv', d.by_product); };
+      area.querySelectorAll('table').forEach(UI.makeTableSortable);
     });
   }
 
@@ -130,6 +133,7 @@ Views.reports = function (container) {
         '<div class="kpi-card"><div class="label">สินค้าใกล้หมด/หมด</div><div class="value">' + d.low_stock_items.length + '</div></div></div>' +
         table(d.items, ['name', 'stock_qty', 'reorder_point', 'stock_value', 'level', 'sold_last_30d', 'turnover_rate']) + '</div>';
       document.getElementById('exp').onclick = function () { UI.exportCsv('stock-report.csv', d.items); };
+      area.querySelectorAll('table').forEach(UI.makeTableSortable);
     });
   }
 
@@ -140,6 +144,7 @@ Views.reports = function (container) {
         '<div class="kpi-card"><div class="label">ความถี่การซื้อเฉลี่ย</div><div class="value">' + d.avg_order_frequency + '</div></div></div></div>' +
         '<div class="card"><h3>Top 10 ลูกค้าตามยอดซื้อ</h3>' + table(d.top_customers, ['name', 'phone', 'total_spend', 'order_count']) + '</div>' +
         '<div class="card"><h3>ลูกค้าที่หายไป (&gt;60 วัน)</h3>' + table(d.churned_customers_60d, ['name', 'phone', 'last_order']) + '</div>';
+      area.querySelectorAll('table').forEach(UI.makeTableSortable);
     });
   }
 
@@ -150,6 +155,7 @@ Views.reports = function (container) {
         '<div class="kpi-grid" style="margin-top:14px"><div class="kpi-card"><div class="label">สลิปรอตรวจสอบ</div><div class="value">' + d.pending_slips_count + '</div><div class="sub">' + UI.money(d.pending_slips_amount) + '</div></div>' +
         '<div class="kpi-card"><div class="label">ยอดค้างชำระ</div><div class="value">' + UI.money(d.unpaid_amount) + '</div></div></div></div>';
       Charts.doughnut('payChart', d.by_method.map(function (m) { return m.method; }), d.by_method.map(function (m) { return m.total; }));
+      area.querySelectorAll('table').forEach(UI.makeTableSortable);
     });
   }
 
@@ -157,6 +163,7 @@ Views.reports = function (container) {
     Api.call('admin.reports.cancellations', r).then(function (d) {
       area.innerHTML = '<div class="card"><div class="kpi-grid"><div class="kpi-card"><div class="label">อัตราการยกเลิก</div><div class="value">' + d.cancellation_rate_pct + '%</div><div class="sub">' + d.cancelled_orders + '/' + d.total_orders + ' ออเดอร์</div></div></div>' +
         '<h3>เหตุผลยอดนิยม</h3>' + table(d.top_reasons, ['reason', 'count']) + '</div>';
+      area.querySelectorAll('table').forEach(UI.makeTableSortable);
     });
   }
 
