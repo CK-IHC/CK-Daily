@@ -102,15 +102,25 @@ Views.stock = function (container) {
 
   function renderStockTable_(wrap, rows) {
     if (!rows.length) { wrap.innerHTML = '<div class="empty-state">ไม่พบสินค้าตามเงื่อนไข</div>'; return; }
-    wrap.innerHTML = '<div class="table-wrap"><table><thead><tr><th>SKU</th><th>ชื่อ</th><th>คงเหลือ</th><th>จุดสั่งซื้อ</th><th>มูลค่าคงคลัง</th><th>สถานะ</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
+    wrap.innerHTML = '<div class="table-wrap"><table><thead><tr><th>SKU</th><th>ชื่อ</th><th>คงเหลือ</th><th>จุดสั่งซื้อ</th><th>มูลค่าคงคลัง</th><th>สถานะสต็อก</th><th>สถานะขาย</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
       rows.map(function (r) {
         return '<tr><td>' + r.sku + '</td><td>' + UI.escapeHtml(r.name) + '</td><td>' + r.stock_qty + ' ' + r.unit + '</td><td>' + r.reorder_point + '</td><td>' + UI.money(r.stock_value) + '</td>' +
           '<td><span class="chip ' + r.level + '">' + { ok: 'ปกติ', low: 'ใกล้หมด', out: 'หมด' }[r.level] + '</span></td>' +
+          '<td><span class="chip ' + (r.is_active ? 'active' : 'cancelled') + '">' + (r.is_active ? 'เปิดขาย' : 'ปิดขาย') + '</span></td>' +
           '<td class="no-print"><button class="btn btn-sm btn-outline" data-action="in" data-id="' + r.product_id + '" data-name="' + UI.escapeHtml(r.name) + '">รับเข้า</button> ' +
           '<button class="btn btn-sm btn-outline" data-action="adjust" data-id="' + r.product_id + '" data-name="' + UI.escapeHtml(r.name) + '">ปรับยอด</button> ' +
-          '<button class="btn btn-sm btn-danger" data-action="waste" data-id="' + r.product_id + '" data-name="' + UI.escapeHtml(r.name) + '">ตัดของเสีย</button></td></tr>';
+          '<button class="btn btn-sm btn-danger" data-action="waste" data-id="' + r.product_id + '" data-name="' + UI.escapeHtml(r.name) + '">ตัดของเสีย</button> ' +
+          '<button class="btn btn-sm btn-outline" data-toggle-active="' + r.product_id + '">' + (r.is_active ? 'ปิดขาย' : 'เปิดขาย') + '</button></td></tr>';
       }).join('') + '</tbody></table></div>';
     wrap.querySelectorAll('[data-action]').forEach(function (btn) { btn.onclick = function () { openAdjustModal(btn.dataset.action, btn.dataset.id, btn.dataset.name); }; });
+    wrap.querySelectorAll('[data-toggle-active]').forEach(function (btn) {
+      btn.onclick = function () {
+        btn.disabled = true;
+        Api.call('admin.products.toggleActive', { product_id: btn.dataset.toggleActive }).then(function () {
+          UI.toast('อัปเดตสถานะขายแล้ว', 'success'); loadList();
+        }).catch(function (err) { btn.disabled = false; UI.toast(err.message, 'error'); });
+      };
+    });
     UI.makeTableSortable(wrap.querySelector('table'));
   }
 

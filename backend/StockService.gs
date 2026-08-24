@@ -45,7 +45,8 @@ function adminStockList(payload, token) {
     var level = qty <= 0 ? 'out' : (qty <= reorder ? 'low' : 'ok');
     return {
       product_id: p.product_id, sku: p.sku, name: p.name, stock_qty: qty, reorder_point: reorder,
-      unit: p.unit, cost_price: numFrom(p.cost_price), stock_value: round2(qty * numFrom(p.cost_price)), level: level
+      unit: p.unit, cost_price: numFrom(p.cost_price), stock_value: round2(qty * numFrom(p.cost_price)), level: level,
+      is_active: boolFrom(p.is_active)
     };
   }).sort(function (a, b) { return a.name.localeCompare(b.name); });
   return ok(rows);
