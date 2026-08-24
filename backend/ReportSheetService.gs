@@ -34,12 +34,18 @@ function adminReportsGenerateSheets(payload, token) {
   var orders = findAll('Orders', null).sort(function (a, b) { return toDate(b.placed_at) - toDate(a.placed_at); });
   var roundNameById = {};
   findAll('Rounds', null, true).forEach(function (r) { roundNameById[r.round_id] = r.round_name; });
+  var orderTypeLabel_ = { pickup: 'รับที่ร้าน', delivery: 'จัดส่ง', dine_in: 'ทานที่ร้าน' };
+  var paymentMethodLabel_ = { cash: 'เงินสด', transfer: 'โอนเงิน', promptpay: 'พร้อมเพย์', credit: 'บัตรเครดิต' };
+  var paymentStatusLabel_ = { unpaid: 'ยังไม่ชำระ', pending_verify: 'รอตรวจสอบสลิป', paid: 'ชำระแล้ว', refunded: 'คืนเงินแล้ว' };
+  var orderStatusLabel_ = { pending: 'รอดำเนินการ', in_progress: 'กำลังดำเนินการ', completed: 'สำเร็จ', cancelled: 'ยกเลิก' };
   var ordersHeaders = ['เลขที่ออเดอร์', 'ชื่อลูกค้า', 'เบอร์โทร', 'แผนก', 'รอบการขาย', 'ประเภท', 'ยอดรวมสินค้า', 'ส่วนลด', 'ยอดสุทธิ', 'วิธีชำระเงิน', 'สถานะการชำระเงิน', 'สถานะออเดอร์', 'เวลาสั่งซื้อ', 'เวลาสำเร็จ'];
   var ordersRows = orders.map(function (o) {
+    var status = normalizeOrderStatus_(o.status);
     return [
       o.order_no, o.customer_name, normalizePhone_(o.phone), departmentForUser_(o.user_id), roundNameById[o.round_id] || '',
-      o.order_type, numFrom(o.subtotal), numFrom(o.discount), numFrom(o.grand_total),
-      o.payment_method, o.payment_status, normalizeOrderStatus_(o.status), o.placed_at, o.completed_at || ''
+      orderTypeLabel_[o.order_type] || o.order_type, numFrom(o.subtotal), numFrom(o.discount), numFrom(o.grand_total),
+      paymentMethodLabel_[o.payment_method] || o.payment_method, paymentStatusLabel_[o.payment_status] || o.payment_status,
+      orderStatusLabel_[status] || status, o.placed_at, o.completed_at || ''
     ];
   });
   var ordersCount = writeReportSheet_(ss, 'Report_Orders', ordersHeaders, ordersRows);
@@ -60,12 +66,13 @@ function adminReportsGenerateSheets(payload, token) {
   var userNameById = {};
   findAll('Users', null, true).forEach(function (u) { userNameById[u.user_id] = u.name || normalizePhone_(u.phone); });
   var movTypeLabel = { out: 'ตัดสต็อก (ขาย)', 'return': 'คืนสต็อก (ยกเลิก)', in: 'รับเข้า', adjust: 'ปรับยอด', waste: 'ของเสีย/สูญหาย' };
+  var movRefTypeLabel_ = { order: 'ออเดอร์', manual: 'ปรับปรุงมือ' };
   var movements = findAll('StockMovements', null, true).sort(function (a, b) { return toDate(b.created_at) - toDate(a.created_at); });
   var movHeaders = ['รหัส SKU', 'ชื่อสินค้า', 'ประเภทการเคลื่อนไหว', 'จำนวนที่เปลี่ยน', 'คงเหลือก่อน', 'คงเหลือหลัง', 'อ้างอิงจาก', 'เหตุผล', 'ผู้ทำรายการ', 'เวลา'];
   var movRows = movements.map(function (m) {
     return [
       m.sku || '', productNameById[m.product_id] || m.product_id, movTypeLabel[m.type] || m.type, numFrom(m.qty_change),
-      numFrom(m.qty_before), numFrom(m.qty_after), m.ref_type || '', m.reason || '', userNameById[m.by_user_id] || m.by_user_id || 'ระบบ', m.created_at
+      numFrom(m.qty_before), numFrom(m.qty_after), movRefTypeLabel_[m.ref_type] || m.ref_type || '', m.reason || '', userNameById[m.by_user_id] || m.by_user_id || 'ระบบ', m.created_at
     ];
   });
   var movCount = writeReportSheet_(ss, 'Report_StockMovements', movHeaders, movRows);

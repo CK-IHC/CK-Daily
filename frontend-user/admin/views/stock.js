@@ -4,6 +4,7 @@
 Views.stock = function (container) {
   var tab = 'list';
   var lastList = [], lastMovements = [];
+  var lastFilteredList = [], lastFilteredMovements = [];
 
   container.innerHTML =
     '<div class="tabs-row no-print"><button class="tab-btn active" data-tab="list">ยอดคงเหลือ</button><button class="tab-btn" data-tab="movements">ประวัติการเคลื่อนไหว</button></div>' +
@@ -19,9 +20,9 @@ Views.stock = function (container) {
   document.getElementById('btnPrint').onclick = function () { UI.printWithHeader(tab === 'list' ? 'รายงานยอดคงเหลือสต็อก' : 'ประวัติการเคลื่อนไหวสต็อก', document.getElementById('area')); };
   document.getElementById('btnExport').onclick = function () {
     if (tab === 'list') {
-      UI.exportCsv('stock-list.csv', lastList.map(function (r) { return { sku: r.sku, name: r.name, stock_qty: r.stock_qty, unit: r.unit, reorder_point: r.reorder_point, stock_value: r.stock_value, level: r.level }; }));
+      UI.exportCsv('stock-list.csv', lastFilteredList.map(function (r) { return { sku: r.sku, name: r.name, stock_qty: r.stock_qty, unit: r.unit, reorder_point: r.reorder_point, stock_value: r.stock_value, level: r.level }; }));
     } else {
-      UI.exportCsv('stock-movements.csv', lastMovements.map(function (m) { return { created_at: m.created_at, product_id: m.product_id, type: m.type, qty_change: m.qty_change, qty_before: m.qty_before, qty_after: m.qty_after, ref_type: m.ref_type, ref_id: m.ref_id, reason: m.reason }; }));
+      UI.exportCsv('stock-movements.csv', lastFilteredMovements.map(function (m) { return { created_at: m.created_at, product_id: m.product_id, type: m.type, qty_change: m.qty_change, qty_before: m.qty_before, qty_after: m.qty_after, ref_type: m.ref_type, ref_id: m.ref_id, reason: m.reason }; }));
     }
   };
   document.getElementById('btnCsvTemplate').onclick = function () {
@@ -67,11 +68,41 @@ Views.stock = function (container) {
     Api.call('admin.stock.list').then(renderList).catch(function (err) { UI.toast(err.message, 'error'); });
   }
 
+  /**
+   * แสดงตัวกรอง (ค้นหา SKU/ชื่อ แบบพิมพ์แล้วกรองทันที + สถานะสต็อก) แยกส่วนกับตารางเสมอ (ไม่ rebuild
+   * ช่องค้นหาทุกครั้งที่กรอง) กันปัญหา cursor/focus หลุดจากช่องพิมพ์ตอนกรองแบบ live ทุกตัวอักษร
+   */
   function renderList(rows) {
     lastList = rows;
     var el = document.getElementById('area');
     if (!el) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
-    el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>SKU</th><th>ชื่อ</th><th>คงเหลือ</th><th>จุดสั่งซื้อ</th><th>มูลค่าคงคลัง</th><th>สถานะ</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
+    el.innerHTML =
+      '<div class="filters-row no-print" style="margin-bottom:10px">' +
+        '<input id="stockSearchInput" class="form-control" placeholder="ค้นหา SKU หรือชื่อสินค้า" style="min-width:220px">' +
+        '<select id="stockLevelSelect" class="form-control" style="width:auto"><option value="">ทุกสถานะ</option><option value="ok">ปกติ</option><option value="low">ใกล้หมด</option><option value="out">หมด</option></select>' +
+      '</div>' +
+      '<div id="stockTableWrap"></div>';
+    document.getElementById('stockSearchInput').oninput = applyStockFilters_;
+    document.getElementById('stockLevelSelect').onchange = applyStockFilters_;
+    applyStockFilters_();
+  }
+
+  function applyStockFilters_() {
+    var wrap = document.getElementById('stockTableWrap');
+    if (!wrap) return;
+    var q = (document.getElementById('stockSearchInput').value || '').trim().toLowerCase();
+    var level = document.getElementById('stockLevelSelect').value;
+    lastFilteredList = lastList.filter(function (r) {
+      if (level && r.level !== level) return false;
+      if (q && (r.sku || '').toLowerCase().indexOf(q) === -1 && (r.name || '').toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+    renderStockTable_(wrap, lastFilteredList);
+  }
+
+  function renderStockTable_(wrap, rows) {
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-state">ไม่พบสินค้าตามเงื่อนไข</div>'; return; }
+    wrap.innerHTML = '<div class="table-wrap"><table><thead><tr><th>SKU</th><th>ชื่อ</th><th>คงเหลือ</th><th>จุดสั่งซื้อ</th><th>มูลค่าคงคลัง</th><th>สถานะ</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
       rows.map(function (r) {
         return '<tr><td>' + r.sku + '</td><td>' + UI.escapeHtml(r.name) + '</td><td>' + r.stock_qty + ' ' + r.unit + '</td><td>' + r.reorder_point + '</td><td>' + UI.money(r.stock_value) + '</td>' +
           '<td><span class="chip ' + r.level + '">' + { ok: 'ปกติ', low: 'ใกล้หมด', out: 'หมด' }[r.level] + '</span></td>' +
@@ -79,8 +110,8 @@ Views.stock = function (container) {
           '<button class="btn btn-sm btn-outline" data-action="adjust" data-id="' + r.product_id + '" data-name="' + UI.escapeHtml(r.name) + '">ปรับยอด</button> ' +
           '<button class="btn btn-sm btn-danger" data-action="waste" data-id="' + r.product_id + '" data-name="' + UI.escapeHtml(r.name) + '">ตัดของเสีย</button></td></tr>';
       }).join('') + '</tbody></table></div>';
-    el.querySelectorAll('[data-action]').forEach(function (btn) { btn.onclick = function () { openAdjustModal(btn.dataset.action, btn.dataset.id, btn.dataset.name); }; });
-    UI.makeTableSortable(el.querySelector('table'));
+    wrap.querySelectorAll('[data-action]').forEach(function (btn) { btn.onclick = function () { openAdjustModal(btn.dataset.action, btn.dataset.id, btn.dataset.name); }; });
+    UI.makeTableSortable(wrap.querySelector('table'));
   }
 
   function openAdjustModal(type, productId, name) {
@@ -115,10 +146,38 @@ Views.stock = function (container) {
       var el = document.getElementById('area');
       if (!el) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
       if (!data.items.length) { el.innerHTML = '<div class="empty-state">ยังไม่มีประวัติ</div>'; return; }
-      el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>วันที่</th><th>สินค้า</th><th>ประเภท</th><th>เปลี่ยนแปลง</th><th>ก่อน→หลัง</th><th>อ้างอิง</th><th>หมายเหตุ</th></tr></thead><tbody>' +
-        data.items.map(function (m) { return '<tr><td>' + UI.fmtTime(m.created_at) + '</td><td>' + m.product_id + '</td><td>' + m.type + '</td><td>' + m.qty_change + '</td><td>' + m.qty_before + ' → ' + m.qty_after + '</td><td>' + (m.ref_type || '') + ' ' + (m.ref_id || '') + '</td><td>' + UI.escapeHtml(m.reason || '') + '</td></tr>'; }).join('') + '</tbody></table></div>';
-      UI.makeTableSortable(el.querySelector('table'));
+      el.innerHTML =
+        '<div class="filters-row no-print" style="margin-bottom:10px">' +
+          '<input id="movSearchInput" class="form-control" placeholder="ค้นหา SKU/รหัสสินค้า หรือประเภท" style="min-width:220px">' +
+          '<select id="movTypeSelect" class="form-control" style="width:auto"><option value="">ทุกประเภท</option>' +
+            ['out', 'return', 'in', 'adjust', 'waste'].map(function (t) { return '<option value="' + t + '">' + t + '</option>'; }).join('') +
+          '</select>' +
+        '</div>' +
+        '<div id="movTableWrap"></div>';
+      document.getElementById('movSearchInput').oninput = applyMovementFilters_;
+      document.getElementById('movTypeSelect').onchange = applyMovementFilters_;
+      applyMovementFilters_();
     }).catch(function (err) { UI.toast(err.message, 'error'); });
+  }
+
+  function applyMovementFilters_() {
+    var wrap = document.getElementById('movTableWrap');
+    if (!wrap) return;
+    var q = (document.getElementById('movSearchInput').value || '').trim().toLowerCase();
+    var type = document.getElementById('movTypeSelect').value;
+    lastFilteredMovements = lastMovements.filter(function (m) {
+      if (type && m.type !== type) return false;
+      if (q && (m.sku || '').toLowerCase().indexOf(q) === -1 && (m.product_id || '').toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+    renderMovementsTable_(wrap, lastFilteredMovements);
+  }
+
+  function renderMovementsTable_(wrap, rows) {
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-state">ไม่พบประวัติตามเงื่อนไข</div>'; return; }
+    wrap.innerHTML = '<div class="table-wrap"><table><thead><tr><th>วันที่</th><th>สินค้า</th><th>ประเภท</th><th>เปลี่ยนแปลง</th><th>ก่อน→หลัง</th><th>อ้างอิง</th><th>หมายเหตุ</th></tr></thead><tbody>' +
+      rows.map(function (m) { return '<tr><td>' + UI.fmtTime(m.created_at) + '</td><td>' + m.product_id + '</td><td>' + m.type + '</td><td>' + m.qty_change + '</td><td>' + m.qty_before + ' → ' + m.qty_after + '</td><td>' + (m.ref_type || '') + ' ' + (m.ref_id || '') + '</td><td>' + UI.escapeHtml(m.reason || '') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    UI.makeTableSortable(wrap.querySelector('table'));
   }
 
   loadList();
