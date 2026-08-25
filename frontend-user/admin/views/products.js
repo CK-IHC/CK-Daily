@@ -41,7 +41,7 @@ Views.products = function (container) {
   document.getElementById('btnPrint').onclick = function () { UI.printWithHeader(tab === 'products' ? 'รายการสินค้า' : 'หมวดหมู่สินค้า', document.getElementById('area')); };
   document.getElementById('btnExport').onclick = function () {
     if (tab === 'products') {
-      UI.exportCsv('products.csv', products.map(function (p) { return { sku: p.sku, name: p.name, category: catName(p.category_id), price: p.price, cost_price: p.cost_price, is_frozen: p.is_frozen, track_stock: p.track_stock, stock_qty: p.stock_qty, is_active: p.is_active }; }));
+      UI.exportCsv('products.csv', lastFilteredProducts.map(function (p) { return { sku: p.sku, name: p.name, category: catName(p.category_id), price: p.price, cost_price: p.cost_price, is_frozen: p.is_frozen, track_stock: p.track_stock, stock_qty: p.stock_qty, is_active: p.is_active }; }));
     } else {
       UI.exportCsv('categories.csv', categories.map(function (c) { return { name: c.name, icon: c.icon, color: c.color, sort_order: c.sort_order, is_active: c.is_active }; }));
     }
@@ -85,21 +85,59 @@ Views.products = function (container) {
 
   function catName(id) { var c = categories.filter(function (x) { return x.category_id === id; })[0]; return c ? c.name : '-'; }
 
+  var lastFilteredProducts = [];
+
+  /**
+   * แสดงตัวกรอง (ค้นหา SKU/ชื่อ แบบพิมพ์แล้วกรองทันที + หมวดหมู่ + สถานะขาย) แยกส่วนกับตารางเสมอ (ไม่
+   * rebuild ช่องค้นหาทุกครั้งที่กรอง) กันปัญหา cursor/focus หลุดจากช่องพิมพ์ตอนกรองแบบ live ทุกตัวอักษร
+   */
   function renderProducts() {
     var el = document.getElementById('area');
     if (!el) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
     if (!products.length) { el.innerHTML = '<div class="empty-state">ยังไม่มีสินค้า</div>'; return; }
-    el.innerHTML = '<div class="table-wrap"><table id="productsPrintTable"><thead><tr><th>SKU</th><th>ชื่อ</th><th>หมวดหมู่</th><th>ราคา</th><th>ต้นทุน</th><th>สต็อก</th><th>สถานะ</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
-      products.map(function (p) {
+    el.innerHTML =
+      '<div class="filters-row no-print" style="margin-bottom:10px">' +
+        '<input id="productSearchInput" class="form-control" placeholder="ค้นหา SKU หรือชื่อสินค้า" style="min-width:220px">' +
+        '<select id="productCategorySelect" class="form-control" style="width:auto"><option value="">ทุกหมวดหมู่</option>' +
+          categories.map(function (c) { return '<option value="' + c.category_id + '">' + UI.escapeHtml(c.name) + '</option>'; }).join('') +
+        '</select>' +
+        '<select id="productActiveSelect" class="form-control" style="width:auto"><option value="">ทุกสถานะ</option><option value="1">เปิดขาย</option><option value="0">ปิดขาย</option></select>' +
+      '</div>' +
+      '<div id="productsTableWrap"></div>';
+    document.getElementById('productSearchInput').oninput = applyProductFilters_;
+    document.getElementById('productCategorySelect').onchange = applyProductFilters_;
+    document.getElementById('productActiveSelect').onchange = applyProductFilters_;
+    applyProductFilters_();
+  }
+
+  function applyProductFilters_() {
+    var wrap = document.getElementById('productsTableWrap');
+    if (!wrap) return;
+    var q = (document.getElementById('productSearchInput').value || '').trim().toLowerCase();
+    var categoryId = document.getElementById('productCategorySelect').value;
+    var activeFilter = document.getElementById('productActiveSelect').value;
+    lastFilteredProducts = products.filter(function (p) {
+      if (categoryId && p.category_id !== categoryId) return false;
+      if (activeFilter !== '' && !!p.is_active !== (activeFilter === '1')) return false;
+      if (q && (p.sku || '').toLowerCase().indexOf(q) === -1 && (p.name || '').toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+    renderProductsTable_(wrap, lastFilteredProducts);
+  }
+
+  function renderProductsTable_(wrap, rows) {
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-state">ไม่พบสินค้าตามเงื่อนไข</div>'; return; }
+    wrap.innerHTML = '<div class="table-wrap"><table id="productsPrintTable"><thead><tr><th>SKU</th><th>ชื่อ</th><th>หมวดหมู่</th><th>ราคา</th><th>ต้นทุน</th><th>สต็อก</th><th>สถานะ</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
+      rows.map(function (p) {
         return '<tr><td>' + p.sku + '</td><td>' + (p.is_frozen ? '<b>[แช่แข็ง]</b> ' : '') + UI.escapeHtml(p.name) + '</td><td>' + UI.escapeHtml(catName(p.category_id)) + '</td><td>' + UI.money(p.price) + '</td><td>' + UI.money(p.cost_price) + '</td>' +
           '<td>' + (p.track_stock ? p.stock_qty : '-') + '</td><td><span class="chip ' + (p.is_active ? 'active' : 'cancelled') + '">' + (p.is_active ? 'เปิดขาย' : 'ปิดขาย') + '</span></td>' +
           '<td class="no-print"><button class="btn btn-sm btn-outline" data-edit="' + p.product_id + '">แก้ไข</button> <button class="btn btn-sm btn-outline" data-opts="' + p.product_id + '">ตัวเลือก</button> <button class="btn btn-sm btn-outline" data-toggle="' + p.product_id + '">' + (p.is_active ? 'ปิดขาย' : 'เปิดขาย') + '</button> <button class="btn btn-sm btn-danger" data-del="' + p.product_id + '">' + Icon('trash', 13) + '</button></td></tr>';
       }).join('') + '</tbody></table></div>';
-    el.querySelectorAll('[data-edit]').forEach(function (b) { b.onclick = function () { openProductModal(products.filter(function (p) { return p.product_id === b.dataset.edit; })[0]); }; });
-    el.querySelectorAll('[data-opts]').forEach(function (b) { b.onclick = function () { openProductOptionsModal(products.filter(function (p) { return p.product_id === b.dataset.opts; })[0]); }; });
-    el.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { if (confirm('ลบสินค้านี้?')) Api.call('admin.products.delete', { product_id: b.dataset.del }).then(function () { UI.toast('ลบแล้ว', 'success'); loadAll(); }).catch(function (err) { UI.toast(err.message, 'error'); }); }; });
-    el.querySelectorAll('[data-toggle]').forEach(function (b) { b.onclick = function () { Api.call('admin.products.toggleActive', { product_id: b.dataset.toggle }).then(function () { UI.toast('อัปเดตแล้ว', 'success'); loadAll(); }); }; });
-    UI.makeTableSortable(el.querySelector('table'));
+    wrap.querySelectorAll('[data-edit]').forEach(function (b) { b.onclick = function () { openProductModal(products.filter(function (p) { return p.product_id === b.dataset.edit; })[0]); }; });
+    wrap.querySelectorAll('[data-opts]').forEach(function (b) { b.onclick = function () { openProductOptionsModal(products.filter(function (p) { return p.product_id === b.dataset.opts; })[0]); }; });
+    wrap.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { if (confirm('ลบสินค้านี้?')) Api.call('admin.products.delete', { product_id: b.dataset.del }).then(function () { UI.toast('ลบแล้ว', 'success'); loadAll(); }).catch(function (err) { UI.toast(err.message, 'error'); }); }; });
+    wrap.querySelectorAll('[data-toggle]').forEach(function (b) { b.onclick = function () { Api.call('admin.products.toggleActive', { product_id: b.dataset.toggle }).then(function () { UI.toast('อัปเดตแล้ว', 'success'); loadAll(); }); }; });
+    UI.makeTableSortable(wrap.querySelector('table'));
   }
 
   /**
