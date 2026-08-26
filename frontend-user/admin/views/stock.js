@@ -3,33 +3,55 @@
  */
 
 /**
- * เปิด modal ปรับสต็อก (รับเข้า/ปรับปรุงยอด/ตัดของเสีย) ของสินค้าหนึ่งชิ้น — ฟังก์ชันกลาง (global) ให้ทั้งหน้า
- * "จัดการสต็อก" และหน้า "สินค้า/หมวดหมู่" (รายการสินค้า) เรียกใช้ร่วมกันได้ ปรับสต็อกได้จากทั้งสองหน้าโดยไม่ต้อง
- * สลับไปมา — onDone(ถ้ามี) ถูกเรียกหลังบันทึกสำเร็จให้แต่ละหน้าไปรีเฟรชข้อมูลของตัวเอง
+ * เปิด modal ปรับสต็อก ของสินค้าหนึ่งชิ้น — ฟังก์ชันกลาง (global) ให้ทั้งหน้า "จัดการสต็อก" และหน้า
+ * "สินค้า/หมวดหมู่" (รายการสินค้า) เรียกใช้ร่วมกันได้ ปรับสต็อกได้จากทั้งสองหน้าโดยไม่ต้องสลับไปมา —
+ * onDone(ถ้ามี) ถูกเรียกหลังบันทึกสำเร็จให้แต่ละหน้าไปรีเฟรชข้อมูลของตัวเอง
  * ปุ่มบันทึกจะ disable + เปลี่ยนข้อความระหว่างรอผลลัพธ์เสมอ กันผู้ใช้กดซ้ำตอนที่ backend ตอบสนองช้า
  * (ก่อนหน้านี้กดแล้วไม่มีอะไรขึ้นเลยจนกว่าจะได้ผลลัพธ์ ทำให้ดูเหมือนค้าง/กดไม่ติด)
+ *
+ * type: 'inadjust' รวม "รับเข้า" กับ "ปรับยอด" ไว้ในฟอร์มเดียว (เลือกโหมดในฟอร์ม) หรือ 'waste' แยกต่างหาก
  */
 function openStockAdjustModal_(type, productId, name, onDone) {
-  var titleMap = { in: 'รับสินค้าเข้า', adjust: 'ปรับปรุงยอด (นับจริง)', waste: 'ตัดของเสีย' };
-  var m = UI.modal(
-    '<button class="modal-close" onclick="this.closest(\'.modal-backdrop\').remove()">✕</button><h3>' + titleMap[type] + ': ' + UI.escapeHtml(name) + '</h3>' +
-    '<div class="form-group"><label>' + (type === 'adjust' ? 'ยอดนับจริง' : 'จำนวน') + '</label><input id="mQty" type="number" class="form-control"></div>' +
-    (type === 'in' ? '<div class="form-row"><div class="form-group"><label>ต้นทุนต่อหน่วย (ถ้ามีการเปลี่ยนแปลง)</label><input id="mCost" type="number" class="form-control"></div>' +
-      '<div class="form-group"><label>ซัพพลายเออร์</label><input id="mSupplier" class="form-control"></div></div>' : '') +
-    (type !== 'in' ? '<div class="form-group"><label>เหตุผล (บังคับกรอก)</label><input id="mReason" class="form-control"></div>' : '') +
-    '<button id="mSubmit" class="btn btn-primary" style="width:100%">บันทึก</button>'
-  );
+  var isInAdjust = type === 'inadjust';
+  var title = isInAdjust ? 'รับเข้า / ปรับยอด' : 'ตัดของเสีย';
+  var html = '<button class="modal-close" onclick="this.closest(\'.modal-backdrop\').remove()">✕</button><h3>' + title + ': ' + UI.escapeHtml(name) + '</h3>';
+  if (isInAdjust) {
+    html +=
+      '<div class="form-group"><label>ประเภทการทำรายการ</label><select id="mMode" class="form-control">' +
+        '<option value="in">รับสินค้าเข้า (เพิ่มจากยอดเดิม)</option>' +
+        '<option value="adjust">ปรับปรุงยอด (นับจริงใหม่ทั้งหมด)</option>' +
+      '</select></div>' +
+      '<div class="form-group"><label id="mQtyLabel">จำนวนที่รับเข้า</label><input id="mQty" type="number" class="form-control"></div>' +
+      '<div id="mInFields" class="form-row"><div class="form-group"><label>ต้นทุนต่อหน่วย (ถ้ามีการเปลี่ยนแปลง)</label><input id="mCost" type="number" class="form-control"></div>' +
+        '<div class="form-group"><label>ซัพพลายเออร์</label><input id="mSupplier" class="form-control"></div></div>';
+  } else {
+    html += '<div class="form-group"><label>จำนวน</label><input id="mQty" type="number" class="form-control"></div>';
+  }
+  html += '<div class="form-group"><label>เหตุผล (ไม่บังคับ)</label><input id="mReason" class="form-control"></div>' +
+    '<button id="mSubmit" class="btn btn-primary" style="width:100%">บันทึก</button>';
+  var m = UI.modal(html);
+
+  if (isInAdjust) {
+    var modeSel = document.getElementById('mMode');
+    var qtyLabel = document.getElementById('mQtyLabel');
+    var inFields = document.getElementById('mInFields');
+    modeSel.onchange = function () {
+      var isIn = modeSel.value === 'in';
+      qtyLabel.textContent = isIn ? 'จำนวนที่รับเข้า' : 'ยอดนับจริง';
+      inFields.style.display = isIn ? '' : 'none';
+    };
+  }
+
   document.getElementById('mSubmit').onclick = function () {
     var btn = document.getElementById('mSubmit');
-    var payload = { product_id: productId, type: type, qty: Number(document.getElementById('mQty').value || 0) };
-    if (type === 'in') {
+    var actualType = isInAdjust ? document.getElementById('mMode').value : type;
+    var payload = { product_id: productId, type: actualType, qty: Number(document.getElementById('mQty').value || 0) };
+    payload.reason = (document.getElementById('mReason').value || '').trim();
+    if (actualType === 'in') {
       var cost = document.getElementById('mCost').value;
       if (cost) payload.cost_price = Number(cost);
       payload.supplier = document.getElementById('mSupplier').value;
-      payload.reason = 'รับสินค้าเข้า';
-    } else {
-      payload.reason = document.getElementById('mReason').value.trim();
-      if (!payload.reason) { UI.toast('กรุณากรอกเหตุผล', 'error'); return; }
+      if (!payload.reason) payload.reason = 'รับสินค้าเข้า';
     }
     btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
     Api.call('admin.stock.adjust', payload).then(function () {
@@ -147,8 +169,7 @@ Views.stock = function (container) {
         return '<tr><td>' + r.sku + '</td><td>' + UI.escapeHtml(r.name) + '</td><td>' + r.stock_qty + ' ' + r.unit + '</td><td>' + r.reorder_point + '</td><td>' + UI.money(r.stock_value) + '</td>' +
           '<td><span class="chip ' + r.level + '">' + { ok: 'ปกติ', low: 'ใกล้หมด', out: 'หมด' }[r.level] + '</span></td>' +
           '<td><span class="chip ' + (r.is_active ? 'active' : 'cancelled') + '">' + (r.is_active ? 'เปิดขาย' : 'ปิดขาย') + '</span></td>' +
-          '<td class="no-print"><button class="btn btn-sm btn-outline" data-action="in" data-id="' + r.product_id + '" data-name="' + UI.escapeHtml(r.name) + '">รับเข้า</button> ' +
-          '<button class="btn btn-sm btn-outline" data-action="adjust" data-id="' + r.product_id + '" data-name="' + UI.escapeHtml(r.name) + '">ปรับยอด</button> ' +
+          '<td class="no-print"><button class="btn btn-sm btn-outline" data-action="inadjust" data-id="' + r.product_id + '" data-name="' + UI.escapeHtml(r.name) + '">รับเข้า/ปรับยอด</button> ' +
           '<button class="btn btn-sm btn-danger" data-action="waste" data-id="' + r.product_id + '" data-name="' + UI.escapeHtml(r.name) + '">ตัดของเสีย</button> ' +
           '<button class="btn btn-sm btn-outline" data-toggle-active="' + r.product_id + '">' + (r.is_active ? 'ปิดขาย' : 'เปิดขาย') + '</button></td></tr>';
       }).join('') + '</tbody></table></div>';

@@ -58,9 +58,6 @@ function adminStockAdjust(payload, token) {
   if (['in', 'adjust', 'waste'].indexOf(payload.type) === -1) {
     throw new ApiError('E_INVALID_PAYLOAD', 'ประเภทต้องเป็น in / adjust / waste', 'type');
   }
-  if ((payload.type === 'adjust' || payload.type === 'waste') && !payload.reason) {
-    throw new ApiError('E_INVALID_PAYLOAD', 'กรุณาระบุเหตุผล', 'reason');
-  }
   var p = findOne('Products', function (r) { return r.product_id === payload.product_id; }, true);
   if (!p) throw new ApiError('E_INVALID_PAYLOAD', 'ไม่พบสินค้า', 'product_id');
 
