@@ -131,12 +131,21 @@ Views.products = function (container) {
       rows.map(function (p) {
         return '<tr><td>' + p.sku + '</td><td>' + (p.is_frozen ? '<b>[แช่แข็ง]</b> ' : '') + UI.escapeHtml(p.name) + '</td><td>' + UI.escapeHtml(catName(p.category_id)) + '</td><td>' + UI.money(p.price) + '</td><td>' + UI.money(p.cost_price) + '</td>' +
           '<td>' + (p.track_stock ? p.stock_qty : '-') + '</td><td><span class="chip ' + (p.is_active ? 'active' : 'cancelled') + '">' + (p.is_active ? 'เปิดขาย' : 'ปิดขาย') + '</span></td>' +
-          '<td class="no-print"><button class="btn btn-sm btn-outline" data-edit="' + p.product_id + '">แก้ไข</button> <button class="btn btn-sm btn-outline" data-opts="' + p.product_id + '">ตัวเลือก</button> <button class="btn btn-sm btn-outline" data-toggle="' + p.product_id + '">' + (p.is_active ? 'ปิดขาย' : 'เปิดขาย') + '</button> <button class="btn btn-sm btn-danger" data-del="' + p.product_id + '">' + Icon('trash', 13) + '</button></td></tr>';
+          '<td class="no-print"><button class="btn btn-sm btn-outline" data-edit="' + p.product_id + '">แก้ไข</button> <button class="btn btn-sm btn-outline" data-opts="' + p.product_id + '">ตัวเลือก</button> <button class="btn btn-sm btn-outline" data-toggle="' + p.product_id + '">' + (p.is_active ? 'ปิดขาย' : 'เปิดขาย') + '</button> <button class="btn btn-sm btn-danger" data-del="' + p.product_id + '">' + Icon('trash', 13) + '</button>' +
+          (p.track_stock
+            ? '<br><button class="btn btn-sm btn-outline" style="margin-top:4px" data-stock="in" data-id="' + p.product_id + '" data-name="' + UI.escapeHtml(p.name) + '">รับเข้า</button> ' +
+              '<button class="btn btn-sm btn-outline" data-stock="adjust" data-id="' + p.product_id + '" data-name="' + UI.escapeHtml(p.name) + '">ปรับยอด</button> ' +
+              '<button class="btn btn-sm btn-danger" data-stock="waste" data-id="' + p.product_id + '" data-name="' + UI.escapeHtml(p.name) + '">ตัดของเสีย</button>'
+            : '') +
+          '</td></tr>';
       }).join('') + '</tbody></table></div>';
     wrap.querySelectorAll('[data-edit]').forEach(function (b) { b.onclick = function () { openProductModal(products.filter(function (p) { return p.product_id === b.dataset.edit; })[0]); }; });
     wrap.querySelectorAll('[data-opts]').forEach(function (b) { b.onclick = function () { openProductOptionsModal(products.filter(function (p) { return p.product_id === b.dataset.opts; })[0]); }; });
     wrap.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { if (confirm('ลบสินค้านี้?')) Api.call('admin.products.delete', { product_id: b.dataset.del }).then(function () { UI.toast('ลบแล้ว', 'success'); loadAll(); }).catch(function (err) { UI.toast(err.message, 'error'); }); }; });
     wrap.querySelectorAll('[data-toggle]').forEach(function (b) { b.onclick = function () { Api.call('admin.products.toggleActive', { product_id: b.dataset.toggle }).then(function () { UI.toast('อัปเดตแล้ว', 'success'); loadAll(); }); }; });
+    // ปรับสต็อก (รับเข้า/ปรับยอด/ตัดของเสีย) ได้ตรงจากหน้ารายการสินค้าเลย ไม่ต้องสลับไปหน้า "จัดการสต็อก"
+    // ใช้ modal กลางร่วมกับหน้าจัดการสต็อก (ดู openStockAdjustModal_ ใน views/stock.js)
+    wrap.querySelectorAll('[data-stock]').forEach(function (b) { b.onclick = function () { openStockAdjustModal_(b.dataset.stock, b.dataset.id, b.dataset.name, loadAll); }; });
     UI.makeTableSortable(wrap.querySelector('table'));
   }
 

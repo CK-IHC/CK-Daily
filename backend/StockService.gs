@@ -106,6 +106,30 @@ function adminStockImportCsv(payload, token) {
 function adminStockMovements(payload, token) {
   requireRole(token, ['manager', 'admin', 'staff']);
   payload = payload || {};
+  var page = numFrom(payload.page, 1), pageSize = numFrom(payload.page_size, 50);
+  var start = (page - 1) * pageSize;
+  var hasFilter = !!(payload.product_id || payload.type || payload.date_from || payload.date_to);
+
+  if (!hasFilter) {
+    // เร็วกว่า: ชีตนี้ไม่มี cache และมีแต่จะยาวขึ้นเรื่อยๆ ตามออเดอร์ทุกใบ ถ้าไม่มีตัวกรองเลย
+    // ไม่ต้องอ่านทั้งชีต — อ่านเฉพาะ "ท้ายชีต" เท่าที่หน้านี้ต้องใช้ เพราะแถวถูกเติมท้ายเรียงตามเวลาอยู่แล้ว
+    var sh = getSheet('StockMovements');
+    var lastRow = sh.getLastRow();
+    var headers = actualHeaders_('StockMovements', sh);
+    var total = Math.max(0, lastRow - 1);
+    var readCount = Math.min(total, page * pageSize);
+    var items = [];
+    if (readCount > 0) {
+      var values = sh.getRange(lastRow - readCount + 1, 1, readCount, headers.length).getValues();
+      for (var i = values.length - 1; i >= 0; i--) {
+        var obj = {};
+        for (var c = 0; c < headers.length; c++) obj[headers[c]] = values[i][c];
+        items.push(obj);
+      }
+    }
+    return ok({ total: total, page: page, page_size: pageSize, items: items.slice(start, start + pageSize) });
+  }
+
   var rows = findAll('StockMovements', function (m) {
     if (payload.product_id && m.product_id !== payload.product_id) return false;
     if (payload.type && m.type !== payload.type) return false;
@@ -113,7 +137,5 @@ function adminStockMovements(payload, token) {
     if (payload.date_to && toDate(m.created_at) > toDate(payload.date_to)) return false;
     return true;
   }, true).sort(function (a, b) { return toDate(b.created_at) - toDate(a.created_at); });
-  var page = numFrom(payload.page, 1), pageSize = numFrom(payload.page_size, 50);
-  var start = (page - 1) * pageSize;
   return ok({ total: rows.length, page: page, page_size: pageSize, items: rows.slice(start, start + pageSize) });
 }
