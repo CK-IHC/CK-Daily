@@ -21,6 +21,7 @@ var ROUTES = {
   'catalog.getPublicSettings': function (p, t) { return catalogGetPublicSettings(); },
   'catalog.getPaymentQrBase64': function (p, t) { return catalogGetPaymentQrBase64(); },
   'catalog.getActiveAnnouncements': function (p, t) { return catalogGetActiveAnnouncements(); },
+  'catalog.getActiveBanners': function (p, t) { return catalogGetActiveBanners(); },
 
   'cart.validate': function (p, t) { return cartValidate(p, t); },
   'coupon.check': function (p, t) { return couponCheck(p, t); },
@@ -118,7 +119,13 @@ var ROUTES = {
   'admin.announcements.create': function (p, t) { return adminAnnouncementsCreate(p, t); },
   'admin.announcements.update': function (p, t) { return adminAnnouncementsUpdate(p, t); },
   'admin.announcements.delete': function (p, t) { return adminAnnouncementsDelete(p, t); },
-  'admin.announcements.uploadImage': function (p, t) { return adminAnnouncementsUploadImage(p, t); }
+  'admin.announcements.uploadImage': function (p, t) { return adminAnnouncementsUploadImage(p, t); },
+
+  'admin.banners.list': function (p, t) { return adminBannersList(p, t); },
+  'admin.banners.create': function (p, t) { return adminBannersCreate(p, t); },
+  'admin.banners.update': function (p, t) { return adminBannersUpdate(p, t); },
+  'admin.banners.delete': function (p, t) { return adminBannersDelete(p, t); },
+  'admin.banners.uploadImage': function (p, t) { return adminBannersUploadImage(p, t); }
 };
 
 function dispatch_(action, payload, token) {

@@ -3,8 +3,9 @@
  */
 Views.home = function (container) {
   var categories = [], products = [], rounds = [], activeCategory = '', searchQuery = '', countdownTimer = null;
+  var bannerTimer = null, bannerIndex = 0;
 
-  container.innerHTML = '<div id="roundBanner"></div><div id="announceArea"></div><div class="search-box"><span style="color:var(--text-muted)">' + Icon('search', 18) + '</span><input id="searchInput" placeholder="ค้นหาสินค้า..."></div>' +
+  container.innerHTML = '<div id="bannerSlider"></div><div id="roundBanner"></div><div id="announceArea"></div><div class="search-box"><span style="color:var(--text-muted)">' + Icon('search', 18) + '</span><input id="searchInput" placeholder="ค้นหาสินค้า..."></div>' +
     '<div id="catScroll" class="cat-scroll"></div>' + '<div id="productArea">' + UI.skeletonGrid(6) + '</div>';
 
   document.getElementById('searchInput').addEventListener('input', debounce(function (e) {
@@ -33,6 +34,49 @@ Views.home = function (container) {
   }).catch(function (err) { UI.toast(err.message, 'error'); });
 
   Api.call('catalog.getActiveAnnouncements').then(renderAnnouncements).catch(function () {});
+  Api.call('catalog.getActiveBanners').then(renderBannerSlider).catch(function () {});
+
+  var BANNER_INTERVAL_MS_ = 4000;
+  function renderBannerSlider(list) {
+    var el = document.getElementById('bannerSlider');
+    if (!el) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
+    clearInterval(bannerTimer);
+    if (!list || !list.length) { el.innerHTML = ''; return; }
+    bannerIndex = 0;
+    el.innerHTML = '<div class="banner-slider">' +
+      '<div class="banner-track" id="bannerTrack">' + list.map(function (b) {
+        var clickable = !!b.link_url;
+        return '<div class="banner-slide' + (clickable ? ' clickable' : '') + '" ' + (clickable ? 'data-link="' + UI.escapeHtml(b.link_url) + '"' : '') + '>' +
+          '<img src="' + b.image_url + '" alt="" loading="lazy"></div>';
+      }).join('') + '</div>' +
+      (list.length > 1 ? '<div class="banner-dots">' + list.map(function (_, i) { return '<span class="banner-dot' + (i === 0 ? ' active' : '') + '" data-i="' + i + '"></span>'; }).join('') + '</div>' : '') +
+    '</div>';
+    var track = document.getElementById('bannerTrack');
+    function goTo(i) {
+      bannerIndex = ((i % list.length) + list.length) % list.length;
+      track.style.transform = 'translateX(-' + (bannerIndex * 100) + '%)';
+      el.querySelectorAll('.banner-dot').forEach(function (d, di) { d.classList.toggle('active', di === bannerIndex); });
+    }
+    function startAuto() {
+      clearInterval(bannerTimer);
+      if (list.length > 1) bannerTimer = setInterval(function () { goTo(bannerIndex + 1); }, BANNER_INTERVAL_MS_);
+    }
+    el.querySelectorAll('.banner-dot').forEach(function (dot) { dot.onclick = function () { goTo(Number(dot.dataset.i)); startAuto(); }; });
+    el.querySelectorAll('.banner-slide.clickable').forEach(function (slide) {
+      slide.onclick = function () { window.open(slide.dataset.link, '_blank', 'noopener'); };
+    });
+    // ปัดซ้าย/ขวาเปลี่ยนสไลด์ได้บนมือถือ นอกเหนือจากรอสไลด์อัตโนมัติ
+    var touchStartX = null;
+    track.addEventListener('touchstart', function (e) { touchStartX = e.touches[0].clientX; }, { passive: true });
+    track.addEventListener('touchend', function (e) {
+      if (touchStartX === null) return;
+      var dx = e.changedTouches[0].clientX - touchStartX;
+      touchStartX = null;
+      if (Math.abs(dx) < 40) return;
+      goTo(bannerIndex + (dx < 0 ? 1 : -1)); startAuto();
+    }, { passive: true });
+    startAuto();
+  }
 
   var ANNOUNCE_SIZE_HEIGHT_ = { small: 70, medium: 120, large: 170 };
   function renderAnnouncements(list) {
@@ -228,5 +272,5 @@ Views.home = function (container) {
     badge.style.display = State.cartCount() > 0 ? 'flex' : 'none';
   }
 
-  return function cleanup() { clearInterval(countdownTimer); };
+  return function cleanup() { clearInterval(countdownTimer); clearInterval(bannerTimer); };
 };

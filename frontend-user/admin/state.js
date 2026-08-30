@@ -4,8 +4,8 @@
 var ROLE_PERMISSIONS = {
   customer: [],
   staff: ['dashboard:view_limited', 'orders:view', 'orders:update_status', 'kanban:view', 'rounds:view', 'payments:verify'],
-  manager: ['dashboard:view', 'dashboard:view_limited', 'orders:view', 'orders:update_status', 'kanban:view', 'rounds:view', 'rounds:manage', 'products:manage', 'stock:manage', 'payments:verify', 'coupons:manage', 'reports:view', 'announcements:manage'],
-  admin: ['dashboard:view', 'dashboard:view_limited', 'orders:view', 'orders:update_status', 'kanban:view', 'rounds:view', 'rounds:manage', 'products:manage', 'stock:manage', 'payments:verify', 'coupons:manage', 'reports:view', 'users:manage', 'settings:manage', 'announcements:manage']
+  manager: ['dashboard:view', 'dashboard:view_limited', 'orders:view', 'orders:update_status', 'kanban:view', 'rounds:view', 'rounds:manage', 'products:manage', 'stock:manage', 'payments:verify', 'coupons:manage', 'reports:view', 'banners:manage', 'announcements:manage'],
+  admin: ['dashboard:view', 'dashboard:view_limited', 'orders:view', 'orders:update_status', 'kanban:view', 'rounds:view', 'rounds:manage', 'products:manage', 'stock:manage', 'payments:verify', 'coupons:manage', 'reports:view', 'users:manage', 'settings:manage', 'banners:manage', 'announcements:manage']
 };
 
 var State = (function () {

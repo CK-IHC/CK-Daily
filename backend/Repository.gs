@@ -20,6 +20,7 @@ var SHEET_SCHEMAS = {
   AuditLog: ['log_id', 'user_id', 'role', 'action', 'entity', 'entity_id', 'before_json', 'after_json', 'ip', 'created_at'],
   Settings: ['key', 'value', 'description'],
   Announcements: ['announcement_id', 'text', 'link_url', 'image_url', 'size', 'sort_order', 'is_active', 'start_at', 'end_at', 'created_at', 'updated_at', 'is_deleted'],
+  Banners: ['banner_id', 'image_url', 'link_url', 'sort_order', 'is_active', 'start_at', 'end_at', 'created_at', 'updated_at', 'is_deleted'],
   Orders_Archive: ['order_id', 'order_no', 'user_id', 'phone', 'customer_name', 'round_id', 'order_type', 'address', 'delivery_note', 'subtotal', 'discount', 'coupon_code', 'delivery_fee', 'vat', 'grand_total', 'payment_method', 'payment_status', 'slip_url', 'slip_urls', 'status', 'cancel_reason', 'placed_at', 'confirmed_at', 'ready_at', 'completed_at', 'staff_id', 'created_at', 'updated_at', 'is_deleted', 'photo_url', 'admin_note']
 };
 

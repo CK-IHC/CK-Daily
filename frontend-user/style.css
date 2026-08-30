@@ -54,6 +54,16 @@ img { max-width: 100%; display: block; }
 .delivery-location-box { position: relative; display: flex; align-items: center; gap: 6px; background: #fff; color: #1f2937; border-radius: 10px; padding: 8px 12px; margin-top: 8px; font-size: 13px; font-weight: 600; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
 .delivery-location-box svg { flex: none; color: var(--primary); }
 
+/* แบนเนอร์สไลด์ใหญ่บนสุดของหน้าแรก — เต็มความกว้าง อัตราส่วน 2:1 (แนะนำรูป 1200x600) เลื่อนสไลด์อัตโนมัติ */
+.banner-slider { position: relative; width: 100%; aspect-ratio: 2 / 1; overflow: hidden; background: var(--surface); }
+.banner-track { display: flex; width: 100%; height: 100%; transition: transform .45s ease; }
+.banner-slide { flex: 0 0 100%; width: 100%; height: 100%; }
+.banner-slide.clickable { cursor: pointer; }
+.banner-slide img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.banner-dots { position: absolute; left: 0; right: 0; bottom: 10px; display: flex; justify-content: center; gap: 6px; }
+.banner-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.55); box-shadow: 0 0 2px rgba(0,0,0,.35); cursor: pointer; transition: background .2s, width .2s; }
+.banner-dot.active { background: #fff; width: 18px; border-radius: 4px; }
+
 /* ประกาศใต้แบนเนอร์รอบใหญ่ — ขนาดจำกัดตายตัวเสมอ (ควบคุมด้วย inline height บนรูป) กันบดบังหน้าแรก */
 #announceArea { display: flex; flex-direction: column; gap: 8px; margin: 10px 16px 0; }
 .announce-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }

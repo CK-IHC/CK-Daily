@@ -174,15 +174,18 @@ var MENU = [
     { hash: '#/payments', icon: 'payments', label: 'ตรวจสอบสลิป', perm: 'payments:verify' },
     { hash: '#/coupons', icon: 'coupons', label: 'คูปอง/โปรโมชั่น', perm: 'coupons:manage' }
   ] },
-  { section: 'การตลาด', items: [{ hash: '#/announcements', icon: 'announcements', label: 'ประกาศหน้าแรก', perm: 'announcements:manage' }] },
+  { section: 'การตลาด', items: [
+    { hash: '#/banners', icon: 'banners', label: 'แบนเนอร์หน้าแรก', perm: 'banners:manage' },
+    { hash: '#/announcements', icon: 'announcements', label: 'ประกาศหน้าแรก', perm: 'announcements:manage' }
+  ] },
   { section: 'จัดการระบบ', items: [
     { hash: '#/users', icon: 'users', label: 'ผู้ใช้งาน', perm: 'users:manage' },
     { hash: '#/reports', icon: 'reports', label: 'รายงาน', perm: 'reports:view' },
     { hash: '#/settings', icon: 'settings', label: 'ตั้งค่าร้าน', perm: 'settings:manage' }
   ] }
 ];
-var PAGE_TITLES = { dashboard: 'Dashboard', liveDashboard: 'Live Dashboard', orders: 'ออเดอร์ทั้งหมด', kanban: 'Kanban Board', rounds: 'จัดการรอบ', products: 'สินค้า/หมวดหมู่', stock: 'จัดการสต็อก', payments: 'ตรวจสอบสลิป', coupons: 'คูปอง/โปรโมชั่น', announcements: 'ประกาศหน้าแรก', users: 'ผู้ใช้งาน', reports: 'รายงาน', settings: 'ตั้งค่าร้าน' };
-var PERM_FOR_ROUTE = { dashboard: 'dashboard:view_limited', liveDashboard: 'dashboard:view', orders: 'orders:view', kanban: 'kanban:view', rounds: 'rounds:view', products: 'products:manage', stock: 'stock:manage', payments: 'payments:verify', coupons: 'coupons:manage', announcements: 'announcements:manage', users: 'users:manage', reports: 'reports:view', settings: 'settings:manage' };
+var PAGE_TITLES = { dashboard: 'Dashboard', liveDashboard: 'Live Dashboard', orders: 'ออเดอร์ทั้งหมด', kanban: 'Kanban Board', rounds: 'จัดการรอบ', products: 'สินค้า/หมวดหมู่', stock: 'จัดการสต็อก', payments: 'ตรวจสอบสลิป', coupons: 'คูปอง/โปรโมชั่น', banners: 'แบนเนอร์หน้าแรก', announcements: 'ประกาศหน้าแรก', users: 'ผู้ใช้งาน', reports: 'รายงาน', settings: 'ตั้งค่าร้าน' };
+var PERM_FOR_ROUTE = { dashboard: 'dashboard:view_limited', liveDashboard: 'dashboard:view', orders: 'orders:view', kanban: 'kanban:view', rounds: 'rounds:view', products: 'products:manage', stock: 'stock:manage', payments: 'payments:verify', coupons: 'coupons:manage', banners: 'banners:manage', announcements: 'announcements:manage', users: 'users:manage', reports: 'reports:view', settings: 'settings:manage' };
 
 var Router = (function () {
   var container, cleanupFn = null;

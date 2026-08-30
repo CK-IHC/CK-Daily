@@ -216,7 +216,12 @@ function adminProductsDelete(payload, token) {
   return ok(null, 'ลบสินค้าแล้ว');
 }
 
-function uploadImageToDrive_(base64, fileName, prefix, folderId, folderName) {
+/**
+ * raw=true: คืนลิงก์ไฟล์ตรง (uc?export=view) แทน thumbnail — จำเป็นสำหรับ GIF ที่ต้องการให้เล่นภาพเคลื่อนไหว
+ * และ SVG (thumbnail endpoint ของ Drive แปลงเป็นภาพนิ่ง/แรสเตอร์เสมอ ทำให้ GIF หยุดขยับและ SVG เสียความคมชัด)
+ * ใช้เฉพาะจุดที่จำเป็นจริงๆ เพราะไฟล์ใหญ่มากอาจเจอหน้าเตือนไวรัสของ Drive ได้ (ปกติไม่เจอกับรูปขนาดปกติ)
+ */
+function uploadImageToDrive_(base64, fileName, prefix, folderId, folderName, raw) {
   var m = /^data:(.+);base64,(.+)$/.exec(base64);
   var contentType = m ? m[1] : 'image/jpeg';
   var data = m ? m[2] : base64;
@@ -227,6 +232,7 @@ function uploadImageToDrive_(base64, fileName, prefix, folderId, folderName) {
   var folder = folderId ? DriveApp.getFolderById(folderId) : getOrCreateDriveFolder_(folderName || 'CK Daily - Product Images');
   var file = folder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  if (raw) return 'https://drive.google.com/uc?export=view&id=' + file.getId();
   // ใช้ URL แบบ thumbnail แทน uc?id= — ฝังเป็น <img> ได้เสถียรกว่ามาก (uc?id= มักโดนหน้าเตือนไวรัส/redirect บล็อกไม่โหลดรูป)
   return 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w1600';
 }
