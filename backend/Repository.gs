@@ -27,10 +27,21 @@ var SHEET_SCHEMAS = {
 // TTL (วินาที) — Users/Rounds cache สั้นๆ เพื่อความไวโดยยังทันความเปลี่ยนแปลง (ทุกจุดเขียนข้อมูล invalidate cache ทันทีอยู่แล้ว)
 var CACHEABLE_SHEETS = { Categories: 300, Products: 300, ProductOptions: 300, Settings: 300, Users: 30, Rounds: 15 };
 
+/**
+ * ถ้า Sheet ที่รู้จักใน SHEET_SCHEMAS (เช่น เพิ่งเพิ่มชีตใหม่ในโค้ด) ยังไม่มีอยู่จริงในสเปรดชีต
+ * ให้สร้างพร้อม header ให้อัตโนมัติทันที กันเคส "ไม่พบ Sheet" ที่ต้องรอรัน repairSchema() ด้วยมือก่อนถึงจะใช้งานได้
+ */
 function getSheet(name) {
   var ss = getSpreadsheet();
   var sh = ss.getSheetByName(name);
-  if (!sh) throw new ApiError('E_SERVER', 'ไม่พบ Sheet: ' + name);
+  if (!sh) {
+    var headers = SHEET_SCHEMAS[name];
+    if (!headers) throw new ApiError('E_SERVER', 'ไม่พบ Sheet: ' + name);
+    sh = ss.insertSheet(name);
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold').setBackground('#1f2937').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+    if (headers.indexOf('phone') > -1) formatPhoneColumnAsText_(sh, headers);
+  }
   return sh;
 }
 
