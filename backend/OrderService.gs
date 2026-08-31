@@ -364,6 +364,25 @@ function awardLoyaltyPoints_(order) {
 }
 
 /** ===================== Admin: Orders ===================== */
+
+/**
+ * "ครั้งที่" ของลูกค้าเบอร์นี้ — นับแยกเป็นรายรอบ (รอบใหม่เริ่มนับ 1 ใหม่เสมอ ไม่นับรวมข้ามรอบ)
+ * คืน map order_id -> { seq, total } ใช้ร่วมกันทั้ง admin.orders.list และ admin.orderItems.export
+ */
+function phoneVisitMap_(orders) {
+  var groups = {};
+  orders.forEach(function (o) {
+    var key = normalizePhone_(o.phone) + '|' + o.round_id;
+    (groups[key] = groups[key] || []).push(o);
+  });
+  var map = {};
+  Object.keys(groups).forEach(function (key) {
+    groups[key].sort(function (a, b) { return toDate(a.placed_at) - toDate(b.placed_at); });
+    groups[key].forEach(function (o, idx) { map[o.order_id] = { seq: idx + 1, total: groups[key].length }; });
+  });
+  return map;
+}
+
 /** เงื่อนไขกรองร่วมของ admin.orders.list / admin.orders.summary / admin.orderItems.export */
 function orderMatchesFilters_(o, payload) {
   if (payload.round_id && o.round_id !== payload.round_id) return false;
@@ -408,11 +427,7 @@ function adminOrdersList(payload, token) {
     });
   });
 
-  var phoneGroups = {};
-  allActive.forEach(function (o) { var p = normalizePhone_(o.phone); (phoneGroups[p] = phoneGroups[p] || []).push(o); });
-  Object.keys(phoneGroups).forEach(function (p) {
-    phoneGroups[p].sort(function (a, b) { return toDate(a.placed_at) - toDate(b.placed_at); });
-  });
+  var phoneVisits = phoneVisitMap_(allActive);
 
   var usersById_ = {};
   findAll('Users', null).forEach(function (u) { usersById_[u.user_id] = u.department || ''; });
@@ -424,9 +439,9 @@ function adminOrdersList(payload, token) {
       d.has_frozen = !!frozenByOrder[o.order_id];
       d.items = itemsByOrder[o.order_id] || [];
       d.department = usersById_[o.user_id] || '';
-      var grp = phoneGroups[normalizePhone_(o.phone)] || [o];
-      d.phone_order_total = grp.length;
-      d.phone_order_seq = grp.map(function (x) { return x.order_id; }).indexOf(o.order_id) + 1;
+      var visit = phoneVisits[o.order_id] || { seq: 1, total: 1 };
+      d.phone_order_total = visit.total;
+      d.phone_order_seq = visit.seq;
       return d;
     })
   });
@@ -482,15 +497,9 @@ function adminOrderItemsExport(payload, token) {
   var items = findAll('OrderItems', function (i) { return orderIds[i.order_id]; })
     .sort(function (a, b) { return toDate(b.created_at) - toDate(a.created_at); });
 
-  // "ครั้งที่" (ลำดับการสั่งของเบอร์นี้ทั้งหมด/จำนวนครั้งทั้งหมด) — คำนวณจากออเดอร์ทั้งหมด (ไม่ใช่แค่ที่กรองอยู่)
-  // ให้ตรงกับตัวเลขที่แสดงในหน้าออเดอร์ทั้งหมดเสมอ
-  var visitByOrderId_ = {};
-  var phoneGroups = {};
-  findAll('Orders', null).forEach(function (o) { var p = normalizePhone_(o.phone); (phoneGroups[p] = phoneGroups[p] || []).push(o); });
-  Object.keys(phoneGroups).forEach(function (p) {
-    phoneGroups[p].sort(function (a, b) { return toDate(a.placed_at) - toDate(b.placed_at); });
-    phoneGroups[p].forEach(function (o, idx) { visitByOrderId_[o.order_id] = { seq: idx + 1, total: phoneGroups[p].length }; });
-  });
+  // "ครั้งที่" (ลำดับการสั่งของเบอร์นี้ในรอบเดียวกัน/จำนวนครั้งทั้งหมดในรอบนั้น) — คำนวณจากออเดอร์ทั้งหมด
+  // (ไม่ใช่แค่ที่กรองอยู่) ให้ตรงกับตัวเลขที่แสดงในหน้าออเดอร์ทั้งหมดเสมอ
+  var visitByOrderId_ = phoneVisitMap_(findAll('Orders', null));
 
   return ok(items.map(function (i) {
     var visit = visitByOrderId_[i.order_id] || { seq: 1, total: 1 };
