@@ -293,9 +293,20 @@ Views.products = function (container) {
       categories.map(function (c) {
         return '<tr><td><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:' + (c.color || '#f97316') + ';border:1px solid var(--border)"></span></td>' +
         '<td>' + CategoryIconHtml(c.icon, 20) + '</td><td>' + UI.escapeHtml(c.name) + '</td><td>' + c.sort_order + '</td><td><span class="chip ' + (c.is_active ? 'active' : 'cancelled') + '">' + (c.is_active ? 'เปิด' : 'ปิด') + '</span></td>' +
-        '<td class="no-print"><button class="btn btn-sm btn-outline" data-edit-cat="' + c.category_id + '">แก้ไข</button> <button class="btn btn-sm btn-danger" data-del-cat="' + c.category_id + '">ลบ</button></td></tr>';
+        '<td class="no-print"><button class="btn btn-sm btn-outline" data-edit-cat="' + c.category_id + '">แก้ไข</button> ' +
+        '<button class="btn btn-sm btn-outline" data-toggle-cat="' + c.category_id + '">' + (c.is_active ? 'ปิด' : 'เปิด') + '</button> ' +
+        '<button class="btn btn-sm btn-danger" data-del-cat="' + c.category_id + '">ลบ</button></td></tr>';
       }).join('') + '</tbody></table></div>';
     el.querySelectorAll('[data-edit-cat]').forEach(function (b) { b.onclick = function () { openCategoryModal(categories.filter(function (c) { return c.category_id === b.dataset.editCat; })[0]); }; });
+    el.querySelectorAll('[data-toggle-cat]').forEach(function (b) {
+      b.onclick = function () {
+        b.disabled = true;
+        var cat = categories.filter(function (c) { return c.category_id === b.dataset.toggleCat; })[0];
+        Api.call('admin.categories.update', { category_id: b.dataset.toggleCat, is_active: !cat.is_active }).then(function () {
+          UI.toast('อัปเดตสถานะแล้ว', 'success'); loadAll();
+        }).catch(function (err) { b.disabled = false; UI.toast(err.message, 'error'); });
+      };
+    });
     el.querySelectorAll('[data-del-cat]').forEach(function (b) { b.onclick = function () { if (confirm('ลบหมวดหมู่นี้?')) Api.call('admin.categories.delete', { category_id: b.dataset.delCat }).then(function () { UI.toast('ลบแล้ว', 'success'); loadAll(); }); }; });
     UI.makeTableSortable(el.querySelector('table'));
   }

@@ -17,18 +17,23 @@ Views.home = function (container) {
   // ยิง loadProducts() ขนานไปเลยโดยไม่รอ categories/rounds ก่อน (ไม่ได้ผูกกัน) ลดเวลาที่ผู้ใช้เห็นสินค้าครั้งแรก
   loadProducts();
 
-  Promise.all([Api.call('catalog.getCategories'), Api.call('catalog.getActiveRounds')]).then(function (res) {
-    categories = res[0]; rounds = res[1];
-    var open = rounds.find(function (r) { return r.is_open_for_order; });
+  // แยกเรียก categories/rounds เป็นคนละ request กัน (เดิมรวมกันใน Promise.all เดียว) กันปัญหาฝั่งใดฝั่งหนึ่ง
+  // ดึงข้อมูลไม่สำเร็จชั่วคราวแล้วทำให้อีกฝั่งที่ควรจะแสดงได้ปกติพลอยไม่แสดงไปด้วย
+  Api.call('catalog.getCategories').then(function (cats) {
+    categories = cats; renderCategories();
+  }).catch(function (err) { UI.toast(err.message, 'error'); });
+
+  Api.call('catalog.getActiveRounds').then(function (r) {
+    rounds = r;
+    var open = rounds.find(function (x) { return x.is_open_for_order; });
     var currentIsOpenRound = open && State.roundId === open.round_id;
     // เลือกรอบที่เปิดรับอยู่เป็นค่าเริ่มต้นเสมอเมื่อเข้าหน้าแรก (ไม่ค้างอยู่ที่รอบเก่าที่ปิดรับไปแล้ว)
     if (!currentIsOpenRound) {
       if (open) State.roundId = open.round_id;
-      else if (!State.roundId || !rounds.some(function (r) { return r.round_id === State.roundId; })) {
+      else if (!State.roundId || !rounds.some(function (x) { return x.round_id === State.roundId; })) {
         State.roundId = rounds[0] ? rounds[0].round_id : null;
       }
     }
-    renderCategories();
     renderRoundBanner();
     startCountdown();
   }).catch(function (err) { UI.toast(err.message, 'error'); });
