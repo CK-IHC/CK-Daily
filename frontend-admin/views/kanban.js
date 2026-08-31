@@ -48,7 +48,7 @@ Views.kanban = function (container) {
         var parts = e.dataTransfer.getData('text/plain').split('|');
         var orderId = parts[0], fromStatus = parts[1], toStatus = col.dataset.status;
         if (fromStatus === toStatus) return;
-        var allowed = ORDER_NEXT_STATUS_[fromStatus] || [];
+        var allowed = nextStatusOptionsFor_(fromStatus);
         if (allowed.indexOf(toStatus) === -1) { UI.toast('เปลี่ยนสถานะจาก ' + UI.statusLabel(fromStatus) + ' เป็น ' + UI.statusLabel(toStatus) + ' ไม่ได้', 'error'); return; }
         Api.call('admin.orders.updateStatus', { order_id: orderId, status: toStatus }).then(function () { UI.toast('อัปเดตแล้ว', 'success'); load(); }).catch(function (err) { UI.toast(err.message, 'error'); });
       });

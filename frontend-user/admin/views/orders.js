@@ -16,6 +16,14 @@ var ORDER_NEXT_STATUS_ = ORDER_STATUS_LIST_.reduce(function (m, s) {
   m[s] = ORDER_STATUS_LIST_.filter(function (x) { return x !== s; });
   return m;
 }, {});
+/**
+ * สถานะที่เปลี่ยนไปได้จากสถานะปัจจุบัน — ถ้าค่าสถานะที่เก็บไว้ไม่ตรงกับ 4 ค่าที่รู้จัก (เช่น
+ * ออเดอร์เก่าที่มีสถานะพังหรือเป็นค่าที่ไม่ได้ map ไว้ใน normalizeOrderStatus_) ให้คืนสถานะทั้งหมด
+ * แทนอาร์เรย์ว่างเปล่า กันเมนูเลือกสถานะไม่มีตัวเลือกให้กดเลย จนแก้ไขสถานะที่ผิดพลาดไม่ได้
+ */
+function nextStatusOptionsFor_(status) {
+  return ORDER_NEXT_STATUS_[status] || ORDER_STATUS_LIST_;
+}
 
 /** เปิด modal รายละเอียดออเดอร์ — ใช้ร่วมกันจากทั้งหน้า Orders และ Kanban */
 function openOrderDetailModal(orderId, onChange) {
@@ -45,7 +53,7 @@ function openOrderDetailModal(orderId, onChange) {
       '<h4>เปลี่ยนสถานะ</h4>' +
       '<div style="display:flex;gap:8px;margin-bottom:14px">' +
         '<select id="odStatusSelect" class="form-control" style="width:auto">' +
-          (ORDER_NEXT_STATUS_[order.status] || []).map(function (s) { return '<option value="' + s + '">' + UI.statusLabel(s) + '</option>'; }).join('') +
+          nextStatusOptionsFor_(order.status).map(function (s) { return '<option value="' + s + '">' + UI.statusLabel(s) + '</option>'; }).join('') +
         '</select>' +
         '<button id="odStatusApply" class="btn btn-primary btn-sm">อัปเดตสถานะ</button>' +
       '</div>' +
@@ -441,7 +449,7 @@ var PAYMENT_STATUS_LABEL_ = { unpaid: '⏳ รอชำระเงิน', pend
 
 /** แสดงผลออเดอร์ที่สแกนเจอ พร้อมสถานะการชำระเงิน/สลิป/รายการสินค้า และเปลี่ยนสถานะได้ทันที */
 function showScanResultModal(order, onDone) {
-  var nextOptions = (ORDER_NEXT_STATUS_[order.status] || []).map(function (s) { return '<option value="' + s + '">' + UI.statusLabel(s) + '</option>'; }).join('');
+  var nextOptions = nextStatusOptionsFor_(order.status).map(function (s) { return '<option value="' + s + '">' + UI.statusLabel(s) + '</option>'; }).join('');
   var items = order.items || [];
   var pendingVerify = order.payment_status === 'pending_verify';
   var m2 = UI.modal(
@@ -710,7 +718,7 @@ Views.orders = function (container) {
     if (!data.items.length) { el.innerHTML = '<div class="empty-state">ไม่พบออเดอร์</div>'; return; }
     el.innerHTML = '<div class="table-wrap"><table><thead><tr><th></th><th data-key="order_no">เลขที่</th><th data-key="customer_name">ลูกค้า</th><th data-key="phone">เบอร์</th><th data-key="phone_order_seq">ครั้งที่</th><th data-key="grand_total">ยอด</th><th data-key="payment_status">ชำระเงิน</th><th data-key="status">สถานะ</th><th data-key="placed_at">เวลา</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
       data.items.map(function (o) {
-        var nextOptions = (ORDER_NEXT_STATUS_[o.status] || []).map(function (s) { return '<option value="' + s + '">' + UI.statusLabel(s) + '</option>'; }).join('');
+        var nextOptions = nextStatusOptionsFor_(o.status).map(function (s) { return '<option value="' + s + '">' + UI.statusLabel(s) + '</option>'; }).join('');
         return '<tr><td>' + (o.photo_url ? '<img src="' + o.photo_url + '" style="width:32px;height:32px;object-fit:cover;border-radius:6px">' : '') + (o.has_frozen ? Icon('snowflake', 13, 'color:#2563eb;display:inline-block;vertical-align:middle') : '') + '</td>' +
           '<td><a href="javascript:void(0)" class="detailLink" data-id="' + o.order_id + '">#' + o.order_no + '</a></td><td>' + UI.escapeHtml(o.customer_name) + '</td><td>' + o.phone + '</td>' +
           '<td>' + (o.phone_order_total > 1 ? '<span class="chip" style="background:#eef2ff;color:#4338ca" title="ลูกค้าเบอร์นี้สั่งมาแล้ว ' + o.phone_order_total + ' ครั้ง">' + o.phone_order_seq + '/' + o.phone_order_total + '</span>' : o.phone_order_seq + '/' + o.phone_order_total) + '</td>' +
