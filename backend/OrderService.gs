@@ -17,6 +17,15 @@ var ORDER_TRANSITIONS = ORDER_STATUSES_ALL_.reduce(function (m, s) {
 var STOCK_RETURN_STATUSES = { pending: 1, in_progress: 1 };
 var STATUS_TIMESTAMP_FIELD = { in_progress: 'confirmed_at', completed: 'completed_at' };
 
+/**
+ * สถานะที่เปลี่ยนต่อไปได้จากสถานะปัจจุบัน (ค่าดิบจากชีต ยังไม่ normalize) — ถ้าค่าที่เก็บไว้ไม่ตรงกับ
+ * 4 ค่าที่รู้จักเลย (เช่น ออเดอร์เก่าที่สถานะว่าง/พังจากข้อมูลเดิม) ให้ถือว่าเปลี่ยนไปสถานะไหนก็ได้ทั้งหมด
+ * แทนการคืนอาร์เรย์ว่างเปล่า กันเปลี่ยนสถานะที่ผิดพลาดแก้ไม่ได้เลย (ต้องตรงกับ nextStatusOptionsFor_ ฝั่ง frontend)
+ */
+function allowedNextStatuses_(rawStatus) {
+  return ORDER_TRANSITIONS[normalizeOrderStatus_(rawStatus)] || ORDER_STATUSES_ALL_;
+}
+
 /** slip_urls เก็บเป็น JSON array string ในชีต — คืนค่าเป็น array เสมอ (รองรับออเดอร์เก่าที่มีแค่ slip_url เดี่ยว) */
 function parseSlipUrls_(o) {
   var list = [];
@@ -305,7 +314,7 @@ function orderCancel(payload, token) {
       throw new ApiError('E_ORDER_NOT_CANCELLABLE', 'ยกเลิกออเดอร์นี้ไม่ได้แล้ว (สถานะเปลี่ยนไปแล้วหรือรอบปิดรับแล้ว)');
     }
   } else {
-    if (ORDER_TRANSITIONS[order.status].indexOf('cancelled') === -1) {
+    if (allowedNextStatuses_(order.status).indexOf('cancelled') === -1) {
       throw new ApiError('E_ORDER_NOT_CANCELLABLE', 'ออเดอร์นี้อยู่ในสถานะที่ยกเลิกไม่ได้แล้ว');
     }
   }
@@ -315,7 +324,7 @@ function orderCancel(payload, token) {
 
 /** ===================== State machine กลาง ===================== */
 function transitionOrderStatus_(order, toStatus, auth, cancelReason) {
-  var allowed = ORDER_TRANSITIONS[order.status] || [];
+  var allowed = allowedNextStatuses_(order.status);
   if (allowed.indexOf(toStatus) === -1) {
     throw new ApiError('E_STATUS_TRANSITION_INVALID', 'เปลี่ยนสถานะจาก ' + order.status + ' เป็น ' + toStatus + ' ไม่ได้');
   }
