@@ -522,7 +522,7 @@ Views.orders = function (container) {
 
   container.innerHTML =
     '<div class="card">' +
-      '<div class="tabs-row no-print"><button class="tab-btn active" data-tab="list">รายการ</button><button class="tab-btn" data-tab="detail">รายละเอียด</button><button class="tab-btn" data-tab="summary">สรุปยอด</button></div>' +
+      '<div class="tabs-row no-print"><button class="tab-btn active" data-tab="list">รายการ</button><button class="tab-btn" data-tab="detail">รายละเอียด</button><button class="tab-btn" data-tab="summary">สรุปยอด</button><button class="tab-btn" data-tab="cancelled">ยกเลิก</button></div>' +
       '<div class="filters-row">' +
         '<select id="fStatus" class="form-control"><option value="">ทุกสถานะ</option>' + ORDER_STATUS_LIST_.map(function (s) { return '<option value="' + s + '">' + UI.statusLabel(s) + '</option>'; }).join('') + '</select>' +
         '<select id="fPayment" class="form-control"><option value="">การชำระเงินทั้งหมด</option><option value="unpaid">ยังไม่ชำระ</option><option value="pending_verify">รอตรวจสอบ</option><option value="paid">ชำระแล้ว</option></select>' +
@@ -582,7 +582,7 @@ Views.orders = function (container) {
   document.getElementById('btnPrintReport').onclick = function () {
     if (!lastData) return;
     // พิมพ์ตามแท็บที่กำลังเปิดดูอยู่จริง ไม่ใช่ข้อมูลค้างจากแท็บอื่นที่เคยโหลดไว้ก่อนหน้า
-    if (tab === 'list') { printOrdersReport(lastData.items, lastData.total); return; }
+    if (tab === 'list' || tab === 'cancelled') { printOrdersReport(lastData.items, lastData.total); return; }
     if (tab === 'detail') { printOrdersDetailReport_(detailRows); return; }
     UI.printWithHeader('สรุปยอดขาย', document.getElementById('tableArea'));
   };
@@ -623,6 +623,8 @@ Views.orders = function (container) {
     if (tab === 'summary') { loadSummary(); return; }
     if (tab === 'detail') { loadDetail(); return; }
     var payload = Object.assign({ page: page, page_size: 30 }, filters);
+    // แท็บ "ยกเลิก" บังคับดูเฉพาะสถานะยกเลิกเสมอ ไม่ว่าตัวกรองสถานะด้านบนจะตั้งเป็นอะไรอยู่ก็ตาม
+    if (tab === 'cancelled') payload.status = 'cancelled';
     Object.keys(payload).forEach(function (k) { if (payload[k] === '') delete payload[k]; });
     Api.call('admin.orders.list', payload).then(function (data) { lastData = data; renderTable(data); }).catch(function (err) { UI.toast(err.message, 'error'); });
   }
