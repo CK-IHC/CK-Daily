@@ -134,6 +134,12 @@ tr:hover td { background: var(--bg); }
 .print-doc-rule { border: none; border-top: 2px solid #111; margin: 10px 0 16px; }
 .print-doc-footer { display: none; font-size: 11px; color: #333; }
 
+/* ช่องค้นหาแบบพิมพ์กรอง (combobox) เช่น ตัวกรอง "รอบ" ในหน้าออเดอร์ทั้งหมด */
+.combo-wrap { position: relative; }
+.combo-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-top: 4px; max-height: 220px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+.combo-item { padding: 8px 12px; font-size: 13px; cursor: pointer; }
+.combo-item:hover { background: var(--bg); }
+
 @media print {
   /* เว้นระยะขอบล่างของหน้ากระดาษให้กว้างพอสำหรับ footer เสมอ กัน footer (fixed) ทับเนื้อหาแถวสุดท้ายของตาราง
      ที่ไหลข้ามหลายหน้า — เนื้อหาจะหยุดที่ขอบ margin-bottom นี้เสมอ ไม่มีทางไหลไปชนบริเวณที่ footer วางอยู่

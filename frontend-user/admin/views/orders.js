@@ -516,9 +516,10 @@ function showScanResultModal(order, onDone) {
 Views.orders = function (container) {
   var filters = { status: '', payment_status: '', search: '', round_id: '' };
   var page = 1, lastData = null, tab = 'list', rounds = [];
-  var detailRows = [], detailSortKey = null, detailSortDir = 'asc';
+  var detailRows = [], detailOrders = [], detailSortKey = null, detailSortDir = 'asc';
   var summarySortKey = null, summarySortDir = 'asc';
   var listSortKey = null, listSortDir = 'asc';
+  var selected = {}; // order_id -> true — ใช้ร่วมกันทุกแท็บที่มี checkbox (list/detail/cancelled)
 
   container.innerHTML =
     '<div class="card">' +
@@ -526,7 +527,7 @@ Views.orders = function (container) {
       '<div class="filters-row">' +
         '<select id="fStatus" class="form-control"><option value="">ทุกสถานะ</option>' + ORDER_STATUS_LIST_.map(function (s) { return '<option value="' + s + '">' + UI.statusLabel(s) + '</option>'; }).join('') + '</select>' +
         '<select id="fPayment" class="form-control"><option value="">การชำระเงินทั้งหมด</option><option value="unpaid">ยังไม่ชำระ</option><option value="pending_verify">รอตรวจสอบ</option><option value="paid">ชำระแล้ว</option></select>' +
-        '<select id="fRound" class="form-control"><option value="">ทุกรอบ</option></select>' +
+        '<div class="combo-wrap" style="width:160px"><input id="fRoundInput" class="form-control" placeholder="ทุกรอบ (พิมพ์ค้นหา)" autocomplete="off"><input type="hidden" id="fRoundValue"><div id="fRoundDropdown" class="combo-dropdown" style="display:none"></div></div>' +
         '<input id="fSearch" class="form-control" placeholder="ค้นหา (เลขที่/ชื่อลูกค้า/เบอร์โทร)" style="min-width:220px">' +
         '<button id="btnFilter" class="btn btn-outline">กรอง</button>' +
         '<button id="btnScan" class="btn btn-outline">📷 สแกน QR</button>' +
@@ -535,15 +536,44 @@ Views.orders = function (container) {
         '<button id="btnExportItems" class="btn btn-outline" title="ดึงข้อมูลดิบจากชีต OrderItems (รวม category_id/order_no) — เปิดด้วย Excel ได้">Export Excel (OrderItems)</button>' +
         '<button id="btnPrintReport" class="btn btn-outline">🖨️ พิมพ์รายงาน</button>' +
       '</div>' +
+      '<div id="bulkBar" class="no-print" style="display:none;align-items:center;gap:8px;margin:0 0 10px;padding:8px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px">' +
+        '<span id="bulkCount" style="font-size:13px;font-weight:700;color:#1e40af"></span>' +
+        '<button id="bulkStatusBtn" class="btn btn-sm btn-outline">เปลี่ยนสถานะที่เลือก</button>' +
+        '<button id="bulkPrintBtn" class="btn btn-sm btn-outline">พิมพ์ที่เลือก</button>' +
+        '<button id="bulkDeleteBtn" class="btn btn-sm btn-danger">ลบที่เลือก</button>' +
+        '<button id="bulkClearBtn" class="btn btn-sm btn-outline" style="margin-left:auto">ล้างการเลือก</button>' +
+      '</div>' +
       '<div id="tableArea">' + UI.loading() + '</div>' +
     '</div>';
 
   Api.call('admin.rounds.list').then(function (data) {
     rounds = data;
-    var sel = document.getElementById('fRound');
-    if (!sel) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
-    sel.insertAdjacentHTML('beforeend', rounds.map(function (r) { return '<option value="' + r.round_id + '">' + UI.escapeHtml(r.round_name) + '</option>'; }).join(''));
+    wireRoundCombo_();
   }).catch(function () {});
+
+  /** ตัวกรอง "รอบ" แบบพิมพ์ค้นหาชื่อรอบได้ (รอบมีจำนวนมากขึ้นเรื่อยๆ เลือกจาก dropdown ยาวๆ ลำบาก) */
+  function wireRoundCombo_() {
+    var input = document.getElementById('fRoundInput');
+    var hidden = document.getElementById('fRoundValue');
+    var dropdown = document.getElementById('fRoundDropdown');
+    if (!input) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
+    function renderOptions(query) {
+      var q = (query || '').trim().toLowerCase();
+      var matches = rounds.filter(function (r) { return !q || r.round_name.toLowerCase().indexOf(q) > -1; });
+      dropdown.innerHTML = '<div class="combo-item" data-id="" data-name="">ทุกรอบ</div>' +
+        matches.map(function (r) { return '<div class="combo-item" data-id="' + r.round_id + '" data-name="' + UI.escapeHtml(r.round_name) + '">' + UI.escapeHtml(r.round_name) + '</div>'; }).join('');
+      dropdown.style.display = 'block';
+      dropdown.querySelectorAll('.combo-item').forEach(function (item) {
+        item.onclick = function () {
+          hidden.value = item.dataset.id; input.value = item.dataset.name;
+          dropdown.style.display = 'none';
+        };
+      });
+    }
+    input.oninput = function () { renderOptions(input.value); };
+    input.onfocus = function () { renderOptions(input.value); };
+    document.addEventListener('click', function (e) { if (e.target !== input && !dropdown.contains(e.target)) dropdown.style.display = 'none'; });
+  }
 
   container.querySelectorAll('.tab-btn').forEach(function (btn) {
     btn.onclick = function () {
@@ -555,7 +585,7 @@ Views.orders = function (container) {
   document.getElementById('btnFilter').onclick = function () {
     filters.status = document.getElementById('fStatus').value;
     filters.payment_status = document.getElementById('fPayment').value;
-    filters.round_id = document.getElementById('fRound').value;
+    filters.round_id = document.getElementById('fRoundValue').value;
     filters.search = document.getElementById('fSearch').value.trim();
     page = 1; load();
   };
@@ -618,8 +648,106 @@ Views.orders = function (container) {
     };
   }
 
+  /** ===================== เลือกหลายรายการ (checkbox คอลัมน์แรก) — ใช้ร่วมกันแท็บ list/detail/cancelled ===================== */
+  function selectedOrderIds_() { return Object.keys(selected).filter(function (id) { return selected[id]; }); }
+
+  function clearSelection_() {
+    selected = {};
+    document.querySelectorAll('.rowChk, .selectAllChk').forEach(function (cb) { cb.checked = false; });
+    updateBulkBar_();
+  }
+
+  function updateBulkBar_() {
+    var ids = selectedOrderIds_();
+    var bar = document.getElementById('bulkBar');
+    if (!bar) return;
+    bar.style.display = ids.length ? 'flex' : 'none';
+    var countEl = document.getElementById('bulkCount');
+    if (countEl) countEl.textContent = 'เลือกไว้ ' + ids.length + ' ออเดอร์';
+  }
+
+  /**
+   * ผูก checkbox คอลัมน์แรก (ทั้งช่อง "เลือกทั้งหมด" ในหัวตาราง และแต่ละแถว) ใช้ร่วมกันได้ทั้งแท็บ
+   * list/cancelled (checkbox ต่อแถว = ต่อออเดอร์อยู่แล้ว) และแท็บ detail (หลายแถวอาจเป็นออเดอร์เดียวกัน
+   * เวลาติ๊กแถวหนึ่งจึงต้อง sync checkbox แถวอื่นที่ order_id เดียวกันให้ติ๊กตามกันไปด้วย)
+   */
+  function wireRowCheckboxes_(el) {
+    var selectAll = el.querySelector('.selectAllChk');
+    function syncRow(id, checked) {
+      el.querySelectorAll('.rowChk[data-id="' + id + '"]').forEach(function (cb) { cb.checked = checked; });
+    }
+    el.querySelectorAll('.rowChk').forEach(function (cb) {
+      cb.onchange = function () {
+        selected[cb.dataset.id] = cb.checked;
+        syncRow(cb.dataset.id, cb.checked);
+        if (selectAll) selectAll.checked = Array.prototype.every.call(el.querySelectorAll('.rowChk'), function (c) { return c.checked; });
+        updateBulkBar_();
+      };
+    });
+    if (selectAll) {
+      selectAll.onchange = function () {
+        var ids = {}; el.querySelectorAll('.rowChk').forEach(function (cb) { ids[cb.dataset.id] = true; });
+        Object.keys(ids).forEach(function (id) { selected[id] = selectAll.checked; syncRow(id, selectAll.checked); });
+        updateBulkBar_();
+      };
+    }
+  }
+
+  /** ข้อมูลเต็มของออเดอร์ที่เลือกไว้ (ใช้พิมพ์ใบเสร็จ) — แท็บ detail ใช้ detailOrders (มี items เต็ม) แทน lastData.items ที่ถูกแตกเป็นรายแถวไปแล้ว */
+  function getSelectedFullOrders_() {
+    var idSet = {}; selectedOrderIds_().forEach(function (id) { idSet[id] = true; });
+    var source = (tab === 'detail' ? detailOrders : (lastData ? lastData.items : [])) || [];
+    return source.filter(function (o) { return idSet[o.order_id]; });
+  }
+
+  document.getElementById('bulkClearBtn').onclick = clearSelection_;
+  document.getElementById('bulkDeleteBtn').onclick = function () {
+    var ids = selectedOrderIds_();
+    if (!ids.length) return;
+    if (!confirm('ลบ ' + ids.length + ' ออเดอร์ที่เลือก? (ประวัติจะถูกซ่อน กู้คืนไม่ได้ผ่านหน้านี้)')) return;
+    var btn = document.getElementById('bulkDeleteBtn');
+    btn.disabled = true;
+    Promise.all(ids.map(function (id) { return Api.call('admin.orders.delete', { order_id: id }).catch(function () { return { __failed: true }; }); }))
+      .then(function (results) {
+        btn.disabled = false;
+        var failed = results.filter(function (r) { return r && r.__failed; }).length;
+        UI.toast(failed ? ('ลบสำเร็จ ' + (ids.length - failed) + '/' + ids.length + ' รายการ') : ('ลบแล้ว ' + ids.length + ' รายการ'), failed ? 'error' : 'success');
+        clearSelection_(); load();
+      });
+  };
+  document.getElementById('bulkPrintBtn').onclick = function () {
+    var orders = getSelectedFullOrders_();
+    if (!orders.length) return;
+    printOrderReceiptsBatch(orders, 1);
+  };
+  document.getElementById('bulkStatusBtn').onclick = function () {
+    var ids = selectedOrderIds_();
+    if (!ids.length) return;
+    var m = UI.modal(
+      '<button class="modal-close" onclick="this.closest(\'.modal-backdrop\').remove()">✕</button>' +
+      '<h3>เปลี่ยนสถานะ ' + ids.length + ' ออเดอร์ที่เลือก</h3>' +
+      '<div class="form-group"><label>สถานะใหม่</label><select id="bulkStatusSelect" class="form-control">' +
+        ORDER_STATUS_LIST_.map(function (s) { return '<option value="' + s + '">' + UI.statusLabel(s) + '</option>'; }).join('') +
+      '</select></div>' +
+      '<button id="bulkStatusApply" class="btn btn-primary" style="width:100%">อัปเดตสถานะ</button>'
+    );
+    document.getElementById('bulkStatusApply').onclick = function () {
+      var status = document.getElementById('bulkStatusSelect').value;
+      var reason = status === 'cancelled' ? prompt('ระบุเหตุผลการยกเลิก:') : null;
+      var applyBtn = document.getElementById('bulkStatusApply');
+      applyBtn.disabled = true; applyBtn.textContent = 'กำลังอัปเดต...';
+      Promise.all(ids.map(function (id) { return Api.call('admin.orders.updateStatus', { order_id: id, status: status, reason: reason }).catch(function () { return { __failed: true }; }); }))
+        .then(function (results) {
+          var failed = results.filter(function (r) { return r && r.__failed; }).length;
+          UI.toast(failed ? ('อัปเดตสำเร็จ ' + (ids.length - failed) + '/' + ids.length + ' รายการ') : ('อัปเดตสถานะแล้ว ' + ids.length + ' รายการ'), failed ? 'error' : 'success');
+          m.remove(); clearSelection_(); load();
+        });
+    };
+  };
+
   function load() {
     document.getElementById('tableArea').innerHTML = UI.loading();
+    clearSelection_(); // เปลี่ยนแท็บ/กรองใหม่/เปลี่ยนหน้า ล้างการเลือกเสมอ กันเลือกค้างจากมุมมองก่อนหน้า
     if (tab === 'summary') { loadSummary(); return; }
     if (tab === 'detail') { loadDetail(); return; }
     var payload = Object.assign({ page: page, page_size: 30 }, filters);
@@ -645,6 +773,7 @@ Views.orders = function (container) {
         return new Date(a.placed_at) - new Date(b.placed_at);
       });
       lastData = Object.assign({}, data, { items: sortedOrders });
+      detailOrders = sortedOrders;
       detailRows = buildDetailRows_(sortedOrders);
       detailSortKey = null; detailSortDir = 'asc';
       renderDetail(detailRows);
@@ -662,6 +791,7 @@ Views.orders = function (container) {
     var orderIds = {}; rows.forEach(function (r) { orderIds[r.order_id] = true; });
     var bodyHtml = rows.map(function (r) {
       return '<tr>' +
+        '<td class="no-print"><input type="checkbox" class="rowChk" data-id="' + r.order_id + '"' + (selected[r.order_id] ? ' checked' : '') + '></td>' +
         '<td><a href="javascript:void(0)" class="detailLink" data-id="' + r.order_id + '">#' + r.order_no + '</a></td>' +
         '<td>' + UI.escapeHtml(r.customer_name) + '</td>' +
         '<td>' + r.phone + '</td>' +
@@ -676,6 +806,7 @@ Views.orders = function (container) {
       '</tr>';
     }).join('');
     el.innerHTML = '<div class="table-wrap"><table><thead><tr>' +
+      '<th class="no-print"><input type="checkbox" class="selectAllChk"></th>' +
       '<th data-key="order_no">เลขที่</th><th data-key="customer_name">ลูกค้า</th><th data-key="phone">เบอร์</th><th data-key="phone_order_seq">ครั้งที่</th>' +
       '<th data-key="grand_total">ยอด</th><th data-key="payment_status">ชำระเงิน</th><th data-key="status">สถานะ</th>' +
       '<th data-key="placed_at">เวลา</th><th data-key="product_name">รายการสั่งซื้อ</th><th data-key="note">หมายเหตุ</th>' +
@@ -683,6 +814,7 @@ Views.orders = function (container) {
       '<div style="margin-top:10px;font-size:12px;color:var(--text-muted)">ทั้งหมด ' + Object.keys(orderIds).length + ' ออเดอร์ (' + rows.length + ' รายการสินค้า)</div>';
     el.querySelectorAll('.detailLink').forEach(function (b) { b.onclick = function () { openOrderDetailModal(b.dataset.id, load); }; });
     el.querySelectorAll('.manageBtn').forEach(function (b) { b.onclick = function () { openOrderDetailModal(b.dataset.id, load); }; });
+    wireRowCheckboxes_(el);
     UI.wireSortHeaders(el.querySelector('thead'), function (key) {
       detailSortDir = (detailSortKey === key && detailSortDir === 'asc') ? 'desc' : 'asc';
       detailSortKey = key;
@@ -718,10 +850,10 @@ Views.orders = function (container) {
     var el = document.getElementById('tableArea');
     if (!el) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
     if (!data.items.length) { el.innerHTML = '<div class="empty-state">ไม่พบออเดอร์</div>'; return; }
-    el.innerHTML = '<div class="table-wrap"><table><thead><tr><th></th><th data-key="order_no">เลขที่</th><th data-key="customer_name">ลูกค้า</th><th data-key="phone">เบอร์</th><th data-key="phone_order_seq">ครั้งที่</th><th data-key="grand_total">ยอด</th><th data-key="payment_status">ชำระเงิน</th><th data-key="status">สถานะ</th><th data-key="placed_at">เวลา</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
+    el.innerHTML = '<div class="table-wrap"><table><thead><tr><th class="no-print"><input type="checkbox" class="selectAllChk"></th><th></th><th data-key="order_no">เลขที่</th><th data-key="customer_name">ลูกค้า</th><th data-key="phone">เบอร์</th><th data-key="phone_order_seq">ครั้งที่</th><th data-key="grand_total">ยอด</th><th data-key="payment_status">ชำระเงิน</th><th data-key="status">สถานะ</th><th data-key="placed_at">เวลา</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
       data.items.map(function (o) {
         var nextOptions = nextStatusOptionsFor_(o.status).map(function (s) { return '<option value="' + s + '">' + UI.statusLabel(s) + '</option>'; }).join('');
-        return '<tr><td>' + (o.photo_url ? '<img src="' + o.photo_url + '" style="width:32px;height:32px;object-fit:cover;border-radius:6px">' : '') + (o.has_frozen ? Icon('snowflake', 13, 'color:#2563eb;display:inline-block;vertical-align:middle') : '') + '</td>' +
+        return '<tr><td class="no-print"><input type="checkbox" class="rowChk" data-id="' + o.order_id + '"' + (selected[o.order_id] ? ' checked' : '') + '></td><td>' + (o.photo_url ? '<img src="' + o.photo_url + '" style="width:32px;height:32px;object-fit:cover;border-radius:6px">' : '') + (o.has_frozen ? Icon('snowflake', 13, 'color:#2563eb;display:inline-block;vertical-align:middle') : '') + '</td>' +
           '<td><a href="javascript:void(0)" class="detailLink" data-id="' + o.order_id + '">#' + o.order_no + '</a></td><td>' + UI.escapeHtml(o.customer_name) + '</td><td>' + o.phone + '</td>' +
           '<td>' + (o.phone_order_total > 1 ? '<span class="chip" style="background:#eef2ff;color:#4338ca" title="ลูกค้าเบอร์นี้สั่งมาแล้ว ' + o.phone_order_total + ' ครั้ง">' + o.phone_order_seq + '/' + o.phone_order_total + '</span>' : o.phone_order_seq + '/' + o.phone_order_total) + '</td>' +
           '<td>' + UI.money(o.grand_total) + '</td>' +
@@ -762,6 +894,7 @@ Views.orders = function (container) {
     var prevBtn = document.getElementById('prevPage'), nextBtn = document.getElementById('nextPage');
     if (prevBtn) prevBtn.onclick = function () { if (page > 1) { page--; load(); } };
     if (nextBtn) nextBtn.onclick = function () { if (page * 30 < data.total) { page++; load(); } };
+    wireRowCheckboxes_(el);
     // เรียงลำดับเฉพาะรายการในหน้าปัจจุบัน (30 รายการ/หน้า) — เปลี่ยนหน้า/กรองใหม่จะรีเซ็ตกลับเป็นเรียงตามเวลาล่าสุดตามปกติ
     UI.wireSortHeaders(el.querySelector('thead'), function (key) {
       listSortDir = (listSortKey === key && listSortDir === 'asc') ? 'desc' : 'asc';
