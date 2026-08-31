@@ -549,7 +549,16 @@ Views.orders = function (container) {
   Api.call('admin.rounds.list').then(function (data) {
     rounds = data;
     wireRoundCombo_();
-  }).catch(function () {});
+    // ค่าเริ่มต้น: ถ้ามีรอบที่เปิดรับออเดอร์อยู่ตอนนี้ ให้กรองเฉพาะรอบนั้นตั้งแต่เข้าหน้าเลย แทนที่จะดึง
+    // ออเดอร์ทุกรอบตั้งแต่อดีตมาแสดงทั้งหมด (ชีต Orders ยิ่งใช้งานนานยิ่งมีข้อมูลเยอะ โหลดช้าโดยไม่จำเป็น)
+    var openRound = rounds.filter(function (r) { return r.is_open_for_order; })[0];
+    if (openRound) {
+      filters.round_id = openRound.round_id;
+      var input = document.getElementById('fRoundInput'), hidden = document.getElementById('fRoundValue');
+      if (input && hidden) { input.value = openRound.round_name; hidden.value = openRound.round_id; }
+    }
+    load();
+  }).catch(function () { load(); });
 
   /** ตัวกรอง "รอบ" แบบพิมพ์ค้นหาชื่อรอบได้ (รอบมีจำนวนมากขึ้นเรื่อยๆ เลือกจาก dropdown ยาวๆ ลำบาก) */
   function wireRoundCombo_() {
@@ -903,6 +912,5 @@ Views.orders = function (container) {
       renderTable(data);
     });
   }
-
-  load();
+  // โหลดครั้งแรกหลังรู้ผล admin.rounds.list แล้วเท่านั้น (ดูจุดเรียก load() ด้านบน) เพื่อกรองรอบปัจจุบันได้ตั้งแต่แรก
 };
