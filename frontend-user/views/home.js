@@ -160,6 +160,20 @@ Views.home = function (container) {
     return (c && c.color) || '';
   }
 
+  /** ป้ายโปรโมชั่นมุมล่างซ้ายของรูปสินค้า (ถ้ามีโปรที่กำลังใช้งานอยู่) */
+  function promoBadgeHtml_(p) {
+    return p.promotion ? '<span class="promo-badge">' + UI.escapeHtml(p.promotion.label) + '</span>' : '';
+  }
+
+  /** ราคา — ถ้าโปรลด%/ลดคงที่คำนวณราคาหลังลดตรงๆ ได้ ให้ขีดฆ่าราคาเดิมแล้วโชว์ราคาใหม่ (BOGO โชว์แค่ป้าย ไม่มีราคาให้คำนวณล่วงหน้า) */
+  function priceHtml_(p) {
+    var unitHtml = p.unit ? '<span class="price-unit">/' + UI.escapeHtml(p.unit) + '</span>' : '';
+    if (p.promotion && p.promotion.display_price !== null && p.promotion.display_price < p.price) {
+      return '<span class="price-original">' + UI.money(p.price) + '</span> <span class="price-discounted">' + UI.money(p.promotion.display_price) + '</span>' + unitHtml;
+    }
+    return UI.money(p.price) + unitHtml;
+  }
+
   function renderCategories() {
     var el = document.getElementById('catScroll');
     if (!el) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อน callback จะทำงาน
@@ -228,7 +242,8 @@ Views.home = function (container) {
         '<div class="thumb">' + (p.image_url ? '<img src="' + p.image_url + '" loading="lazy">' : '🍱') +
         (p.is_frozen ? '<span class="frozen-badge" title="อาหารแช่แข็ง (Freezing)">' + Icon('snowflake', 14) + '</span>' : '') +
         (p.track_stock ? '<span class="stock-badge">' + (disabled ? 'สินค้าหมด' : 'เหลือ ' + p.stock_qty + ' ' + p.unit) + '</span>' : '') +
-        '</div><div class="body"><div class="name">' + UI.escapeHtml(p.name) + '</div><div class="price">' + UI.money(p.price) + (p.unit ? '<span class="price-unit">/' + UI.escapeHtml(p.unit) + '</span>' : '') + '</div>' +
+        promoBadgeHtml_(p) +
+        '</div><div class="body"><div class="name">' + UI.escapeHtml(p.name) + '</div><div class="price">' + priceHtml_(p) + '</div>' +
         '<div class="card-controls">' + cardControlHtml(p) + '</div>' +
         '</div></div>';
     }).join('') + '</div>';

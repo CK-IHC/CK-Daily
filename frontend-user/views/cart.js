@@ -55,11 +55,19 @@ Views.cart = function (container) {
     return validated.issues.filter(function (x) { return x.product_id === productId && (x.issue === 'out_of_stock' || x.issue === 'stock_clipped'); })[0] || null;
   }
 
+  /** ส่วนลดจากโปรโมชั่นของสินค้าชิ้นนี้ (คำนวณจริงจากราคาฝั่งเซิร์ฟเวอร์ใน cart.validate เสมอ) */
+  function promoInfoFor_(productId) {
+    if (!validated || !validated.items) return null;
+    var match = validated.items.filter(function (x) { return x.product_id === productId; })[0];
+    return (match && match.promo_discount > 0) ? { discount: match.promo_discount, label: match.promo_label } : null;
+  }
+
   function renderItems() {
     var el = document.getElementById('itemsList');
     el.innerHTML = State.cart.map(function (item, idx) {
       var issue = stockIssueFor_(item.product_id);
       var soldOut = issue && issue.issue === 'out_of_stock';
+      var promo = soldOut ? null : promoInfoFor_(item.product_id);
       return '<div class="cart-item' + (soldOut ? ' out-of-stock' : '') + '">' +
         '<div class="thumb" style="position:relative">' + (item.image_url ? '<img src="' + item.image_url + '" style="width:100%;height:100%;object-fit:cover;border-radius:10px">' : '🍱') +
         (item.is_frozen ? '<span class="frozen-badge" style="width:18px;height:18px;top:-4px;right:-4px" title="อาหารแช่แข็ง">' + Icon('snowflake', 11) + '</span>' : '') + '</div>' +
@@ -67,7 +75,8 @@ Views.cart = function (container) {
         '<div class="opts">' + UI.escapeHtml((item.option_names || []).join(', ')) + (item.note ? ' | ' + UI.escapeHtml(item.note) : '') + '</div>' +
         (soldOut
           ? '<div class="price" style="color:#dc2626;font-weight:700">สินค้าหมด</div>'
-          : '<div class="price">' + UI.money(item.unit_price) + ' x ' + item.qty + (issue ? ' <span style="color:#d97706;font-size:11px;font-weight:600">(เหลือ ' + issue.qty_available + ' ชิ้น)</span>' : '') + '</div>') +
+          : '<div class="price">' + UI.money(item.unit_price) + ' x ' + item.qty + (issue ? ' <span style="color:#d97706;font-size:11px;font-weight:600">(เหลือ ' + issue.qty_available + ' ชิ้น)</span>' : '') + '</div>' +
+            (promo ? '<div style="font-size:11px;font-weight:700;color:#dc2626">' + UI.escapeHtml(promo.label) + ' — ประหยัด ' + UI.money(promo.discount) + '</div>' : '')) +
         '</div>' +
         (soldOut
           ? '<div class="qty-control" style="opacity:.4;pointer-events:none"><button class="qMinus" disabled>−</button><span>' + item.qty + '</span><button class="qPlus" disabled>+</button></div>'
@@ -142,11 +151,16 @@ Views.cart = function (container) {
 
   function renderSummary() {
     if (!validated) return;
+    // subtotal ที่ backend คืนมาเป็นยอดหลังหักส่วนลดโปรโมชั่นแล้ว (ใช้คำนวณยอดสุทธิจริง) — แต่โชว์ "ยอดรวมสินค้า"
+    // เป็นราคาเต็มก่อนลด แล้วแยกบรรทัด "ประหยัดจากโปรโมชั่น" ต่างหาก อ่านง่ายกว่าตามรูปแบบใบเสร็จทั่วไป
+    var originalSubtotal = round2_(validated.subtotal + (validated.promo_savings || 0));
     UI.setHtml('summaryBox',
-      '<div class="summary-row"><span class="muted">ยอดรวมสินค้า</span><span>' + UI.money(validated.subtotal) + '</span></div>' +
+      '<div class="summary-row"><span class="muted">ยอดรวมสินค้า</span><span>' + UI.money(originalSubtotal) + '</span></div>' +
+      (validated.promo_savings ? '<div class="summary-row"><span class="muted">ประหยัดจากโปรโมชั่น</span><span style="color:#dc2626">-' + UI.money(validated.promo_savings) + '</span></div>' : '') +
       (validated.discount ? '<div class="summary-row"><span class="muted">ส่วนลด</span><span>-' + UI.money(validated.discount) + '</span></div>' : '') +
       '<div class="summary-row total"><span>ยอดสุทธิ</span><span>' + UI.money(validated.grand_total) + '</span></div>');
   }
+  function round2_(n) { return Math.round(n * 100) / 100; }
 
   function renderIssues() {
     // ปัญหาเรื่องสต็อก (out_of_stock/stock_clipped) แสดงที่ตัวรายการสินค้าโดยตรงแล้ว (renderItems) ไม่ต้องซ้ำใน banner นี้

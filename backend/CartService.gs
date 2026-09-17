@@ -12,6 +12,7 @@ function priceCartItems_(items, strict) {
   if (!items || !items.length) throw new ApiError('E_INVALID_PAYLOAD', 'ตะกร้าว่างเปล่า', 'items');
   var computed = [];
   var issues = [];
+  var promoMap = activePromotionsByProduct_();
 
   items.forEach(function (it) {
     var product = findOne('Products', function (r) { return r.product_id === it.product_id; });
@@ -63,9 +64,11 @@ function priceCartItems_(items, strict) {
     });
 
     var unitPrice = round2(numFrom(product.price) + optionDelta);
+    var promo = promoMap[product.product_id];
+    var priced = applyProductPromotion_(promo, unitPrice, qty);
     computed.push({
       product_id: product.product_id, category_id: product.category_id || '', sku: product.sku || '', product_name: product.name, unit_price: unitPrice, qty: qty,
-      line_total: round2(unitPrice * qty), note: String(it.note || '').slice(0, 200),
+      line_total: priced.line_total, promo_discount: priced.discount, promo_label: priced.promo_label, note: String(it.note || '').slice(0, 200),
       options_json: JSON.stringify(optionSnapshot), option_names: optionSnapshot.map(function (o) { return o.name; }),
       track_stock: boolFrom(product.track_stock), is_frozen: boolFrom(product.is_frozen)
     });
@@ -79,6 +82,7 @@ function priceCartItems_(items, strict) {
 function computeOrderTotals_(items, orderType, couponCode, userId, strict) {
   var priced = priceCartItems_(items, strict);
   var subtotal = round2(priced.computed.reduce(function (s, i) { return s + i.line_total; }, 0));
+  var promoSavings = round2(priced.computed.reduce(function (s, i) { return s + (i.promo_discount || 0); }, 0));
 
   var couponResult = { discount: 0, freeDelivery: false, coupon: null };
   if (couponCode) {
@@ -95,7 +99,7 @@ function computeOrderTotals_(items, orderType, couponCode, userId, strict) {
   var grandTotal = round2(taxableBase + deliveryFee + vat);
 
   return {
-    items: priced.computed, issues: priced.issues, subtotal: subtotal, discount: discount,
+    items: priced.computed, issues: priced.issues, subtotal: subtotal, discount: discount, promo_savings: promoSavings,
     delivery_fee: round2(deliveryFee), vat: vat, grand_total: grandTotal, coupon: couponResult.coupon
   };
 }
@@ -118,7 +122,7 @@ function cartValidate(payload, token) {
 
   return ok({
     items: totals.items, issues: totals.issues, round: roundInfo,
-    subtotal: totals.subtotal, discount: totals.discount, delivery_fee: totals.delivery_fee,
+    subtotal: totals.subtotal, discount: totals.discount, promo_savings: totals.promo_savings, delivery_fee: totals.delivery_fee,
     vat: totals.vat, grand_total: totals.grand_total, has_changes: totals.issues.length > 0
   });
 }

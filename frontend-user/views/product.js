@@ -27,7 +27,7 @@ Views.product = function (container, params) {
         '<div class="container">' +
           '<h2 style="margin:0 0 4px;display:flex;align-items:center;gap:8px">' + UI.escapeHtml(p.name) +
             (p.is_frozen ? '<span style="color:#2563eb" title="อาหารแช่แข็ง">' + Icon('snowflake', 18) + '</span>' : '') + '</h2>' +
-          '<div style="color:var(--primary);font-weight:800;font-size:18px;margin-bottom:8px">' + UI.money(p.price) + ' / ' + UI.escapeHtml(p.unit) + '</div>' +
+          promoPriceHtml_(p) +
           (!p.in_stock ? '<div class="empty-state" style="padding:14px;color:#dc2626;font-weight:700">สินค้าหมด</div>' : '') +
           '<p style="color:var(--text-muted);font-size:14px">' + UI.escapeHtml(p.description || '') + '</p>' +
           '<div id="optionGroups" style="' + (!p.in_stock ? 'opacity:.5;pointer-events:none' : '') + '"></div>' +
@@ -109,6 +109,18 @@ Views.product = function (container, params) {
   }
 
   function flatOptions(p) { var all = []; p.option_groups.forEach(function (g) { all = all.concat(g.options); }); return all; }
+  /** แถบราคา + ป้ายโปรโมชั่น (ถ้ามี) — ลด%/ลดคงที่โชว์ราคาหลังลดขีดฆ่าราคาเดิมได้เลย BOGO โชว์แค่ป้าย (ต้องมีจำนวนในตะกร้าก่อนถึงจะรู้ว่าฟรีกี่ชิ้น) */
+  function promoPriceHtml_(p) {
+    if (p.promotion && p.promotion.display_price !== null && p.promotion.display_price < p.price) {
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+        '<span style="text-decoration:line-through;color:var(--text-muted);font-size:14px">' + UI.money(p.price) + '</span>' +
+        '<span style="color:#dc2626;font-weight:800;font-size:18px">' + UI.money(p.promotion.display_price) + '</span>' +
+        '<span style="color:var(--text-muted);font-size:13px">/' + UI.escapeHtml(p.unit) + '</span>' +
+        '<span class="promo-chip">' + UI.escapeHtml(p.promotion.label) + '</span></div>';
+    }
+    return '<div style="color:var(--primary);font-weight:800;font-size:18px;margin-bottom:' + (p.promotion ? '4px' : '8px') + '">' + UI.money(p.price) + ' / ' + UI.escapeHtml(p.unit) + '</div>' +
+      (p.promotion ? '<div style="margin-bottom:8px"><span class="promo-chip">' + UI.escapeHtml(p.promotion.label) + '</span></div>' : '');
+  }
   function computeUnitPrice(p) {
     var delta = 0;
     Object.keys(selected).forEach(function (g) { selected[g].forEach(function (id) {

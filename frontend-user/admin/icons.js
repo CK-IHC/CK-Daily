@@ -10,6 +10,7 @@ var ICON_PATHS_ = {
   stock: '<path d="M20.5 8v12h-17V8"/><path d="M1.5 3h21v5h-21z"/><path d="M9.5 12h5"/>',
   payments: '<rect x="1" y="4.5" width="22" height="15" rx="2"/><path d="M1 9.5h22"/><path d="M5 15h4"/>',
   coupons: '<path d="M19.6 12.9 10.7 21.8a1.9 1.9 0 0 1-2.7 0l-6.8-6.8a1.9 1.9 0 0 1 0-2.7L10.1 3.4a1.9 1.9 0 0 1 1.35-.55H18a2 2 0 0 1 2 2v6.65a1.9 1.9 0 0 1-.4 1.4Z"/><circle cx="15" cy="8" r="1.5"/>',
+  promotions: '<path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="3.2"/>',
   announcements: '<path d="M3 11v2a2 2 0 0 0 2 2h1l1.5 5h2l-1.3-5H12l7 4V6l-7 4H6a3 3 0 0 0-3 3Z"/><path d="M12 6v10"/><path d="M18 9.5a2.5 2.5 0 0 1 0 5"/>',
   banners: '<rect x="2.5" y="5" width="19" height="14" rx="2"/><circle cx="8" cy="10" r="1.8"/><path d="M2.5 16l5-4.5 4 3.5 3-2.5 5 4.5"/>',
   users: '<path d="M16 21v-1.8a3.6 3.6 0 0 0-3.6-3.6H5.6A3.6 3.6 0 0 0 2 19.2V21"/><circle cx="8.8" cy="7.8" r="3.6"/><path d="M22 21v-1.8a3.6 3.6 0 0 0-2.7-3.5"/><path d="M15 4.4a3.6 3.6 0 0 1 0 7"/>',

@@ -14,18 +14,20 @@ function publicCategory_(c) {
   return { category_id: c.category_id, name: c.name, sort_order: numFrom(c.sort_order), icon: c.icon, color: c.color || '', is_active: boolFrom(c.is_active) };
 }
 
-function publicProduct_(p) {
+function publicProduct_(p, promo) {
   return {
     product_id: p.product_id, sku: p.sku, name: p.name, category_id: p.category_id,
     description: p.description, image_url: p.image_url, price: numFrom(p.price), unit: p.unit,
     track_stock: boolFrom(p.track_stock), stock_qty: numFrom(p.stock_qty), max_per_order: numFrom(p.max_per_order),
     has_options: boolFrom(p.has_options), is_active: boolFrom(p.is_active), sort_order: numFrom(p.sort_order),
-    in_stock: !boolFrom(p.track_stock) || numFrom(p.stock_qty) > 0, is_frozen: boolFrom(p.is_frozen)
+    in_stock: !boolFrom(p.track_stock) || numFrom(p.stock_qty) > 0, is_frozen: boolFrom(p.is_frozen),
+    promotion: promo ? publicPromotionBadge_(promo, numFrom(p.price)) : null
   };
 }
 
 function catalogGetProducts(payload) {
   payload = payload || {};
+  var promoMap = activePromotionsByProduct_();
   var products = findAll('Products', function (p) { return boolFrom(p.is_active); });
   if (payload.category) {
     products = products.filter(function (p) { return p.category_id === payload.category; });
@@ -36,7 +38,7 @@ function catalogGetProducts(payload) {
       return String(p.name).toLowerCase().indexOf(q) > -1 || String(p.sku).toLowerCase().indexOf(q) > -1;
     });
   }
-  var result = products.map(publicProduct_);
+  var result = products.map(function (p) { return publicProduct_(p, promoMap[p.product_id]); });
   if (boolFrom(payload.in_stock_only)) {
     result = result.filter(function (p) { return p.in_stock; });
   }
@@ -60,7 +62,8 @@ function catalogGetProductDetail(payload) {
     if (!groups[o.group_name]) groups[o.group_name] = { group_name: o.group_name, is_required: o.is_required, max_select: o.max_select, options: [] };
     groups[o.group_name].options.push({ option_id: o.option_id, option_name: o.option_name, price_delta: o.price_delta });
   });
-  var data = publicProduct_(p);
+  var promo = activePromotionsByProduct_()[p.product_id];
+  var data = publicProduct_(p, promo);
   data.option_groups = Object.keys(groups).map(function (k) { return groups[k]; });
   return ok(data);
 }

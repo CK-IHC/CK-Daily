@@ -94,6 +94,11 @@ var ROUTES = {
   'admin.coupons.update': function (p, t) { return adminCouponsUpdate(p, t); },
   'admin.coupons.delete': function (p, t) { return adminCouponsDelete(p, t); },
 
+  'admin.promotions.list': function (p, t) { return adminPromotionsList(p, t); },
+  'admin.promotions.create': function (p, t) { return adminPromotionsCreate(p, t); },
+  'admin.promotions.update': function (p, t) { return adminPromotionsUpdate(p, t); },
+  'admin.promotions.delete': function (p, t) { return adminPromotionsDelete(p, t); },
+
   'admin.users.list': function (p, t) { return adminUsersList(p, t); },
   'admin.users.create': function (p, t) { return adminUsersCreate(p, t); },
   'admin.users.updateRole': function (p, t) { return adminUsersUpdateRole(p, t); },
