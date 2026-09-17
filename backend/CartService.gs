@@ -65,14 +65,23 @@ function priceCartItems_(items, strict) {
 
     var unitPrice = round2(numFrom(product.price) + optionDelta);
     var promo = promoMap[product.product_id];
-    var priced = applyProductPromotion_(promo, unitPrice, qty);
-    computed.push({
+    var lineTotal = round2(unitPrice * qty);
+    var row = {
       product_id: product.product_id, category_id: product.category_id || '', sku: product.sku || '', product_name: product.name, unit_price: unitPrice, qty: qty,
-      line_total: priced.line_total, promo_discount: priced.discount, promo_label: priced.promo_label, note: String(it.note || '').slice(0, 200),
+      line_total: lineTotal, promo_discount: 0, promo_label: '', note: String(it.note || '').slice(0, 200),
       options_json: JSON.stringify(optionSnapshot), option_names: optionSnapshot.map(function (o) { return o.name; }),
       track_stock: boolFrom(product.track_stock), is_frozen: boolFrom(product.is_frozen)
-    });
+    };
+    if (promo && promo.type === 'bogo') {
+      row.__bogoPromo = promo; // นับรวมข้ามสินค้าที่ร่วมโปรเดียวกันทีหลัง (applyMixMatchBogoDiscounts_) ยังคำนวณส่วนลดไม่ได้ตอนนี้
+    } else if (promo) {
+      var priced = applyProductPromotion_(promo, unitPrice, qty);
+      row.line_total = priced.line_total; row.promo_discount = priced.discount; row.promo_label = priced.promo_label;
+    }
+    computed.push(row);
   });
+
+  applyMixMatchBogoDiscounts_(computed); // จัดกลุ่มสินค้าที่ร่วมโปร bogo เดียวกัน คำนวณของแถมรวมข้ามสินค้า (ซื้อผสมกันได้)
 
   if (strict && computed.length === 0) throw new ApiError('E_INVALID_PAYLOAD', 'ไม่มีสินค้าที่สั่งซื้อได้ในตะกร้า', 'items');
   return { computed: computed, issues: issues };

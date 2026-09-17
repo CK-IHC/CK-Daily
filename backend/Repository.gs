@@ -15,7 +15,7 @@ var SHEET_SCHEMAS = {
   OrderItems: ['item_id', 'order_id', 'order_no', 'product_id', 'sku', 'customer_name', 'user_id', 'phone', 'category_id', 'product_name', 'options_json', 'unit_price', 'qty', 'line_total', 'note', 'created_at', 'updated_at', 'is_deleted'],
   StockMovements: ['movement_id', 'product_id', 'sku', 'type', 'qty_change', 'qty_before', 'qty_after', 'ref_type', 'ref_id', 'reason', 'by_user_id', 'created_at'],
   Coupons: ['coupon_id', 'code', 'type', 'value', 'min_spend', 'max_discount', 'usage_limit', 'used_count', 'per_user_limit', 'start_at', 'end_at', 'is_active', 'created_at', 'updated_at', 'is_deleted'],
-  Promotions: ['promotion_id', 'product_id', 'name', 'type', 'value', 'buy_qty', 'free_qty', 'start_at', 'end_at', 'is_active', 'created_at', 'updated_at', 'is_deleted'],
+  Promotions: ['promotion_id', 'product_ids', 'name', 'type', 'value', 'buy_qty', 'free_qty', 'start_at', 'end_at', 'is_active', 'created_at', 'updated_at', 'is_deleted'],
   Payments: ['payment_id', 'order_id', 'customer_name', 'phone', 'amount', 'method', 'slip_url', 'verified_by', 'verified_at', 'status', 'created_at', 'updated_at'],
   Notifications: ['noti_id', 'user_id', 'title', 'body', 'type', 'is_read', 'ref_id', 'created_at', 'is_deleted'],
   AuditLog: ['log_id', 'user_id', 'role', 'action', 'entity', 'entity_id', 'before_json', 'after_json', 'ip', 'created_at'],

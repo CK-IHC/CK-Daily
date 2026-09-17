@@ -1,5 +1,5 @@
 /**
- * views/promotions.js — โปรโมชั่นลดราคาอัตโนมัติต่อสินค้า (ไม่ต้องกรอกโค้ดแบบคูปอง)
+ * views/promotions.js — โปรโมชั่นลดราคาอัตโนมัติ ผูกกับสินค้าได้หลายรายการ (ไม่ต้องกรอกโค้ดแบบคูปอง)
  * รองรับลด%/ลดคงที่/ซื้อ-แถม (BOGO) — ตั้งช่วงเวลาสั้นๆ (เริ่ม-สิ้นสุด) ใช้เป็นแฟลชเซลได้ทันที
  */
 var PROMOTION_TYPE_LABEL_ = { percent: 'ลด %', fixed: 'ลดคงที่/ชิ้น', bogo: 'ซื้อ-แถม (BOGO)' };
@@ -7,8 +7,9 @@ var PROMOTION_TYPE_LABEL_ = { percent: 'ลด %', fixed: 'ลดคงที่
 Views.promotions = function (container) {
   var promotions = [], products = [];
   container.innerHTML = '<div class="card"><div class="card-head"><h3>โปรโมชั่น</h3><button id="btnAdd" class="btn btn-primary">+ สร้างโปรโมชั่น</button></div>' +
-    '<div style="font-size:12px;color:var(--text-muted);padding:0 16px 10px">โปรโมชั่นที่ "เปิดใช้งาน" จะลดราคาให้ลูกค้าอัตโนมัติทันทีที่เข้าเงื่อนไข ไม่ต้องกรอกโค้ด — ผูกกับสินค้าได้ทีละ 1 รายการ ' +
-      'ตั้งช่วง "เริ่ม-สิ้นสุด" เป็นช่วงเวลาสั้นๆ เพื่อทำเป็นแฟลชเซลได้ สินค้าหนึ่งชิ้นเปิดโปรพร้อมกันได้แค่ 1 รายการ (เปิดโปรใหม่จะปิดโปรเดิมของสินค้านั้นให้อัตโนมัติ)</div>' +
+    '<div style="font-size:12px;color:var(--text-muted);padding:0 16px 10px">โปรโมชั่นที่ "เปิดใช้งาน" จะลดราคาให้ลูกค้าอัตโนมัติทันทีที่เข้าเงื่อนไข ไม่ต้องกรอกโค้ด — เพิ่มสินค้าที่ร่วมโปรได้หลายรายการ ' +
+      '(แบบ "ซื้อ-แถม" นับจำนวนซื้อรวมทุกสินค้าในโปรเดียวกันปนกันได้ เช่น ซื้อ A+B+C รวมครบ 4 ชิ้น แถม 1 ชิ้นที่ถูกที่สุดในรายการ) ' +
+      'ตั้งช่วง "เริ่ม-สิ้นสุด" เป็นช่วงเวลาสั้นๆ เพื่อทำเป็นแฟลชเซลได้ สินค้าชิ้นหนึ่งอยู่ในโปร active พร้อมกันได้แค่ 1 รายการ (เปิดโปรใหม่ทับจะปิดโปรเดิมของสินค้านั้นให้อัตโนมัติ)</div>' +
     '<div id="area">' + UI.loading() + '</div></div>';
   document.getElementById('btnAdd').onclick = function () { openModal(); };
   load();
@@ -29,10 +30,10 @@ Views.promotions = function (container) {
     var el = document.getElementById('area');
     if (!el) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
     if (!promotions.length) { el.innerHTML = '<div class="empty-state">ยังไม่มีโปรโมชั่น</div>'; return; }
-    el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>สินค้า</th><th>ชื่อโปร</th><th>ประเภท</th><th>ส่วนลด</th><th>ช่วงเวลา</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>' +
+    el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>สินค้าที่ร่วมโปร</th><th>ชื่อโปร</th><th>ประเภท</th><th>ส่วนลด</th><th>ช่วงเวลา</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>' +
       promotions.map(function (p) {
         var period = (p.start_at || p.end_at) ? (UI.fmtTime(p.start_at) || 'ตอนนี้') + ' – ' + (UI.fmtTime(p.end_at) || 'ไม่กำหนด') : 'ตลอดไป';
-        return '<tr><td>' + UI.escapeHtml(p.product_name) + '</td><td>' + UI.escapeHtml(p.name || '-') + '</td>' +
+        return '<tr><td style="max-width:260px;font-size:12.5px">' + UI.escapeHtml((p.product_names || []).join(', ')) + '</td><td>' + UI.escapeHtml(p.name || '-') + '</td>' +
           '<td>' + PROMOTION_TYPE_LABEL_[p.type] + '</td><td>' + valueLabel_(p) + '</td><td style="font-size:12px">' + period + '</td>' +
           '<td><span class="chip ' + (p.is_active ? 'active' : 'cancelled') + '">' + (p.is_active ? 'เปิด' : 'ปิด') + '</span></td>' +
           '<td><button class="btn btn-sm btn-outline" data-edit="' + p.promotion_id + '">แก้ไข</button> <button class="btn btn-sm btn-danger" data-del="' + p.promotion_id + '">ลบ</button></td></tr>';
@@ -48,11 +49,15 @@ Views.promotions = function (container) {
   }
 
   function openModal(p) {
+    var selectedIds = p ? p.product_ids.slice() : [];
+
     var m = UI.modal(
       '<button class="modal-close" onclick="this.closest(\'.modal-backdrop\').remove()">✕</button><h3>' + (p ? 'แก้ไขโปรโมชั่น' : 'สร้างโปรโมชั่น') + '</h3>' +
-      '<div class="form-group"><label>สินค้าที่ร่วมโปรโมชั่น</label><select id="mProduct" class="form-control">' +
-        products.map(function (x) { return '<option value="' + x.product_id + '"' + (p && p.product_id === x.product_id ? ' selected' : '') + '>' + UI.escapeHtml(x.name) + ' (' + UI.money(x.price) + ')</option>'; }).join('') +
-      '</select></div>' +
+      '<div class="form-group"><label>สินค้าที่ร่วมโปรโมชั่น</label>' +
+        '<div id="mProductChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>' +
+        '<div style="display:flex;gap:8px"><select id="mProductPicker" class="form-control"></select>' +
+        '<button id="mProductAddBtn" type="button" class="btn btn-outline btn-sm" style="white-space:nowrap">+ เพิ่มสินค้า</button></div>' +
+      '</div>' +
       '<div class="form-group"><label>ชื่อโปรโมชั่น (ไม่บังคับ — ไว้จำเฉยๆ)</label><input id="mName" class="form-control" placeholder="เช่น แฟลชเซลวันศุกร์" value="' + (p ? UI.escapeHtml(p.name || '') : '') + '"></div>' +
       '<div class="form-group"><label>ประเภท</label><select id="mType" class="form-control">' +
         '<option value="percent">ลดเปอร์เซ็นต์</option><option value="fixed">ลดคงที่ต่อชิ้น</option><option value="bogo">ซื้อ-แถม (BOGO)</option>' +
@@ -67,6 +72,38 @@ Views.promotions = function (container) {
       (p ? '<label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer"><input type="checkbox" id="mActive" ' + (p.is_active ? 'checked' : '') + '> เปิดใช้งานโปรโมชั่นนี้</label>' : '') +
       '<button id="mSubmit" class="btn btn-primary" style="width:100%">บันทึก</button>'
     );
+
+    function productName_(id) { var x = products.filter(function (y) { return y.product_id === id; })[0]; return x ? x.name : id; }
+
+    function renderChips_() {
+      var wrap = document.getElementById('mProductChips');
+      wrap.innerHTML = selectedIds.length
+        ? selectedIds.map(function (id) {
+            return '<span class="chip active" style="display:inline-flex;align-items:center;gap:6px;padding:4px 4px 4px 10px">' + UI.escapeHtml(productName_(id)) +
+              '<button type="button" data-remove="' + id + '" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:800;padding:0 4px;font-size:13px">✕</button></span>';
+          }).join('')
+        : '<span style="font-size:12px;color:var(--text-muted)">ยังไม่ได้เลือกสินค้า</span>';
+      wrap.querySelectorAll('[data-remove]').forEach(function (b) {
+        b.onclick = function () { selectedIds = selectedIds.filter(function (id) { return id !== b.dataset.remove; }); renderChips_(); renderPicker_(); };
+      });
+    }
+
+    function renderPicker_() {
+      var picker = document.getElementById('mProductPicker');
+      var available = products.filter(function (x) { return selectedIds.indexOf(x.product_id) === -1; });
+      picker.innerHTML = available.length
+        ? available.map(function (x) { return '<option value="' + x.product_id + '">' + UI.escapeHtml(x.name) + ' (' + UI.money(x.price) + ')</option>'; }).join('')
+        : '<option value="">— ไม่มีสินค้าให้เพิ่มแล้ว —</option>';
+    }
+
+    renderChips_(); renderPicker_();
+    document.getElementById('mProductAddBtn').onclick = function () {
+      var id = document.getElementById('mProductPicker').value;
+      if (!id) return;
+      selectedIds.push(id);
+      renderChips_(); renderPicker_();
+    };
+
     var typeSel = document.getElementById('mType');
     typeSel.value = p ? p.type : 'percent';
 
@@ -81,9 +118,10 @@ Views.promotions = function (container) {
 
     document.getElementById('mSubmit').onclick = function () {
       var btn = document.getElementById('mSubmit');
+      if (!selectedIds.length) { UI.toast('กรุณาเลือกสินค้าที่ร่วมโปรโมชั่นอย่างน้อย 1 รายการ', 'error'); return; }
       var type = typeSel.value;
       var payload = {
-        product_id: document.getElementById('mProduct').value, name: document.getElementById('mName').value.trim(), type: type,
+        product_ids: selectedIds, name: document.getElementById('mName').value.trim(), type: type,
         start_at: document.getElementById('mStart').value, end_at: document.getElementById('mEnd').value
       };
       if (type === 'bogo') {
