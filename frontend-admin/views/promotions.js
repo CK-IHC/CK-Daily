@@ -11,7 +11,11 @@ Views.promotions = function (container) {
       '(แบบ "ซื้อ-แถม" นับจำนวนซื้อรวมทุกสินค้าในโปรเดียวกันปนกันได้ เช่น ซื้อ A+B+C รวมครบ 4 ชิ้น แถม 1 ชิ้นที่ถูกที่สุดในรายการ) ' +
       'ตั้งช่วง "เริ่ม-สิ้นสุด" เป็นช่วงเวลาสั้นๆ เพื่อทำเป็นแฟลชเซลได้ สินค้าชิ้นหนึ่งอยู่ในโปร active พร้อมกันได้แค่ 1 รายการ (เปิดโปรใหม่ทับจะปิดโปรเดิมของสินค้านั้นให้อัตโนมัติ)</div>' +
     '<div id="area">' + UI.loading() + '</div></div>';
-  document.getElementById('btnAdd').onclick = function () { openModal(); };
+  document.getElementById('btnAdd').onclick = function () {
+    // กันกดปุ่มนี้เร็วกว่ารายการสินค้าจะโหลดเสร็จ (โหลดครั้งแรกยังไม่มาถึง) เช็คซ้ำให้ชัวร์ว่ามีสินค้าให้เลือกก่อนเปิด modal เสมอ
+    if (products.length) { openModal(); return; }
+    Api.call('admin.products.list').then(function (data) { products = data; openModal(); }).catch(function (err) { UI.toast(err.message, 'error'); });
+  };
   load();
 
   function load() {
