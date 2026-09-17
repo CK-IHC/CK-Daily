@@ -100,9 +100,10 @@ function catalogGetPaymentQrBase64() {
 /** ===================== Admin: Products CRUD ===================== */
 function adminProductsList(payload, token) {
   requireRole(token, ['manager', 'admin']);
+  var promoMap = activePromotionsByProduct_();
   var rows = findAll('Products', null).sort(function (a, b) { return numFrom(a.sort_order) - numFrom(b.sort_order); });
   return ok(rows.map(function (p) {
-    var o = publicProduct_(p);
+    var o = publicProduct_(p, promoMap[p.product_id]);
     o.cost_price = numFrom(p.cost_price);
     o.reorder_point = numFrom(p.reorder_point);
     return o;

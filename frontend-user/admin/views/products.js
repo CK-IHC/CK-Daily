@@ -129,7 +129,9 @@ Views.products = function (container) {
     if (!rows.length) { wrap.innerHTML = '<div class="empty-state">ไม่พบสินค้าตามเงื่อนไข</div>'; return; }
     wrap.innerHTML = '<div class="table-wrap"><table id="productsPrintTable"><thead><tr><th>SKU</th><th>ชื่อ</th><th>หมวดหมู่</th><th>ราคา</th><th>ต้นทุน</th><th>สต็อก</th><th>สถานะ</th><th class="no-print">จัดการ</th></tr></thead><tbody>' +
       rows.map(function (p) {
-        return '<tr><td>' + p.sku + '</td><td>' + (p.is_frozen ? '<b>[แช่แข็ง]</b> ' : '') + UI.escapeHtml(p.name) + '</td><td>' + UI.escapeHtml(catName(p.category_id)) + '</td><td>' + UI.money(p.price) + '</td><td>' + UI.money(p.cost_price) + '</td>' +
+        return '<tr><td>' + p.sku + '</td><td>' + (p.is_frozen ? '<b>[แช่แข็ง]</b> ' : '') + UI.escapeHtml(p.name) +
+          (p.promotion ? ' <span style="display:inline-block;font-size:10px;font-weight:800;background:#dc2626;color:#fff;padding:2px 7px;border-radius:999px;white-space:nowrap">🔥 ' + UI.escapeHtml(p.promotion.label) + '</span>' : '') +
+          '</td><td>' + UI.escapeHtml(catName(p.category_id)) + '</td><td>' + UI.money(p.price) + '</td><td>' + UI.money(p.cost_price) + '</td>' +
           '<td>' + (p.track_stock ? p.stock_qty : '-') + '</td><td><span class="chip ' + (p.is_active ? 'active' : 'cancelled') + '">' + (p.is_active ? 'เปิดขาย' : 'ปิดขาย') + '</span></td>' +
           '<td class="no-print"><button class="btn btn-sm btn-outline" data-edit="' + p.product_id + '">แก้ไข</button> <button class="btn btn-sm btn-outline" data-opts="' + p.product_id + '">ตัวเลือก</button> <button class="btn btn-sm btn-outline" data-toggle="' + p.product_id + '">' + (p.is_active ? 'ปิดขาย' : 'เปิดขาย') + '</button> <button class="btn btn-sm btn-danger" data-del="' + p.product_id + '">' + Icon('trash', 13) + '</button>' +
           (p.track_stock

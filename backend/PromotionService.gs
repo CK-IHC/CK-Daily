@@ -13,13 +13,21 @@
 
 var PROMOTION_TYPES_ = ['percent', 'fixed', 'bogo'];
 
-function parsePromotionProductIds_(raw) {
-  try { var arr = JSON.parse(raw || '[]'); return Array.isArray(arr) ? arr : []; } catch (e) { return []; }
+/**
+ * รายการ product_id ของโปรนี้ — รองรับข้อมูลเก่าที่สร้างไว้ก่อนรองรับหลายสินค้า (มีแค่คอลัมน์ product_id
+ * เดี่ยวๆ ไม่มี product_ids) ด้วย กันโปรที่เคยสร้างไว้ก่อนอัปเดตหายไปเงียบๆ ไม่ต้องลบแล้วสร้างใหม่
+ */
+function promotionProductIds_(p) {
+  if (p && p.product_ids) {
+    try { var arr = JSON.parse(p.product_ids); if (Array.isArray(arr) && arr.length) return arr; } catch (e) { /* เก็บ format แปลกๆ เก่าไว้ก็ไม่พัง ตกไปเช็ค product_id เดี่ยวต่อ */ }
+  }
+  if (p && p.product_id) return [p.product_id];
+  return [];
 }
 
 function publicPromotion_(p) {
   return {
-    promotion_id: p.promotion_id, product_ids: parsePromotionProductIds_(p.product_ids), name: p.name || '', type: p.type,
+    promotion_id: p.promotion_id, product_ids: promotionProductIds_(p), name: p.name || '', type: p.type,
     value: numFrom(p.value), buy_qty: numFrom(p.buy_qty), free_qty: numFrom(p.free_qty),
     start_at: p.start_at || '', end_at: p.end_at || '', is_active: boolFrom(p.is_active),
     created_at: p.created_at, updated_at: p.updated_at
@@ -37,7 +45,7 @@ function activePromotionsByProduct_() {
   });
   var map = {};
   rows.forEach(function (p) {
-    parsePromotionProductIds_(p.product_ids).forEach(function (pid) { if (!map[pid]) map[pid] = p; });
+    promotionProductIds_(p).forEach(function (pid) { if (!map[pid]) map[pid] = p; });
   });
   return map;
 }
@@ -172,7 +180,7 @@ function deactivateOverlappingPromotions_(productIds, keepPromotionId) {
   var idSet = {}; productIds.forEach(function (id) { idSet[id] = true; });
   findAll('Promotions', function (p) {
     if (p.promotion_id === keepPromotionId || !boolFrom(p.is_active)) return false;
-    return parsePromotionProductIds_(p.product_ids).some(function (id) { return idSet[id]; });
+    return promotionProductIds_(p).some(function (id) { return idSet[id]; });
   }).forEach(function (p) { updateRowAt('Promotions', p.__row, { is_active: false }); });
 }
 
@@ -208,7 +216,7 @@ function adminPromotionsUpdate(payload, token) {
   ['value', 'buy_qty', 'free_qty'].forEach(function (f) { if (payload[f] !== undefined) patch[f] = numFrom(payload[f]); });
   if (payload.is_active !== undefined) patch.is_active = boolFrom(payload.is_active);
   var updated = updateByKey('Promotions', 'promotion_id', payload.promotion_id, patch);
-  if (boolFrom(updated.is_active)) deactivateOverlappingPromotions_(parsePromotionProductIds_(updated.product_ids), updated.promotion_id);
+  if (boolFrom(updated.is_active)) deactivateOverlappingPromotions_(promotionProductIds_(updated), updated.promotion_id);
   writeAudit(auth.user.user_id, auth.user.role, 'update', 'Promotion', payload.promotion_id, null, updated);
   return ok(publicPromotion_(updated), 'บันทึกโปรโมชั่นแล้ว');
 }
