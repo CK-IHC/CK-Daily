@@ -6,7 +6,7 @@ Views.home = function (container) {
   var bannerTimer = null, bannerIndex = 0;
 
   container.innerHTML = '<div id="bannerSlider"></div><div id="roundBanner"></div><div id="announceArea"></div><div class="search-box"><span style="color:var(--text-muted)">' + Icon('search', 18) + '</span><input id="searchInput" placeholder="ค้นหาสินค้า..."></div>' +
-    '<div id="catScroll" class="cat-scroll"></div>' + '<div id="productArea">' + UI.skeletonGrid(6) + '</div>';
+    '<div id="promoBanner"></div><div id="catScroll" class="cat-scroll"></div>' + '<div id="productArea">' + UI.skeletonGrid(6) + '</div>';
 
   document.getElementById('searchInput').addEventListener('input', debounce(function (e) {
     searchQuery = e.target.value; loadProducts();
@@ -40,6 +40,17 @@ Views.home = function (container) {
 
   Api.call('catalog.getActiveAnnouncements').then(renderAnnouncements).catch(function () {});
   Api.call('catalog.getActiveBanners').then(renderBannerSlider).catch(function () {});
+  Api.call('catalog.getActivePromotions').then(renderPromoBanner).catch(function () {});
+
+  /** แถบชื่อโปรโมชั่นที่กำลังใช้งานอยู่ ใต้กล่องค้นหา — แค่ให้รู้ว่ามีโปรอะไรบ้าง กดเข้าไปดูสินค้าที่ร่วมโปรได้เอง */
+  function renderPromoBanner(list) {
+    var el = document.getElementById('promoBanner');
+    if (!el) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
+    if (!list || !list.length) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div class="promo-banner-strip">' + list.map(function (p) {
+      return '<span class="promo-banner-pill">🔥 ' + UI.escapeHtml(p.name) + '</span>';
+    }).join('') + '</div>';
+  }
 
   var BANNER_INTERVAL_MS_ = 4000;
   function renderBannerSlider(list) {

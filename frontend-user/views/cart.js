@@ -55,11 +55,12 @@ Views.cart = function (container) {
     return validated.issues.filter(function (x) { return x.product_id === productId && (x.issue === 'out_of_stock' || x.issue === 'stock_clipped'); })[0] || null;
   }
 
-  /** ส่วนลดจากโปรโมชั่นของสินค้าชิ้นนี้ (คำนวณจริงจากราคาฝั่งเซิร์ฟเวอร์ใน cart.validate เสมอ) */
+  /** ป้ายโปรโมชั่นของสินค้าชิ้นนี้ (คำนวณจริงจากราคาฝั่งเซิร์ฟเวอร์ใน cart.validate เสมอ) — แสดงไว้ให้ลูกค้ารู้ว่า
+   * มีโปรอยู่แม้ยังซื้อไม่ครบเงื่อนไข (เช่น bogo) จะได้กดเพิ่มของตามโปรได้ถ้าอยากได้ส่วนลด แต่ไม่บังคับซื้อครบ */
   function promoInfoFor_(productId) {
     if (!validated || !validated.items) return null;
     var match = validated.items.filter(function (x) { return x.product_id === productId; })[0];
-    return (match && match.promo_discount > 0) ? { discount: match.promo_discount, label: match.promo_label } : null;
+    return (match && match.promo_label) ? { discount: match.promo_discount || 0, label: match.promo_label } : null;
   }
 
   function renderItems() {
@@ -76,7 +77,7 @@ Views.cart = function (container) {
         (soldOut
           ? '<div class="price" style="color:#dc2626;font-weight:700">สินค้าหมด</div>'
           : '<div class="price">' + UI.money(item.unit_price) + ' x ' + item.qty + (issue ? ' <span style="color:#d97706;font-size:11px;font-weight:600">(เหลือ ' + issue.qty_available + ' ชิ้น)</span>' : '') + '</div>' +
-            (promo ? '<div style="font-size:11px;font-weight:700;color:#dc2626">' + UI.escapeHtml(promo.label) + ' — ประหยัด ' + UI.money(promo.discount) + '</div>' : '')) +
+            (promo ? '<div style="font-size:11px;font-weight:700;color:' + (promo.discount > 0 ? '#dc2626' : '#d97706') + '">🎁 ' + UI.escapeHtml(promo.label) + (promo.discount > 0 ? ' — ประหยัด ' + UI.money(promo.discount) : '') + '</div>' : '')) +
         '</div>' +
         (soldOut
           ? '<div class="qty-control" style="opacity:.4;pointer-events:none"><button class="qMinus" disabled>−</button><span>' + item.qty + '</span><button class="qPlus" disabled>+</button></div>'

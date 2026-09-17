@@ -22,6 +22,7 @@ var ROUTES = {
   'catalog.getPaymentQrBase64': function (p, t) { return catalogGetPaymentQrBase64(); },
   'catalog.getActiveAnnouncements': function (p, t) { return catalogGetActiveAnnouncements(); },
   'catalog.getActiveBanners': function (p, t) { return catalogGetActiveBanners(); },
+  'catalog.getActivePromotions': function (p, t) { return catalogGetActivePromotions(); },
 
   'cart.validate': function (p, t) { return cartValidate(p, t); },
   'coupon.check': function (p, t) { return couponCheck(p, t); },

@@ -42,6 +42,27 @@ function activePromotionsByProduct_() {
   return map;
 }
 
+/** ชื่อโปรที่ใช้แสดงผลหน้าร้าน — ถ้าแอดมินไม่ได้ตั้งชื่อไว้ (ไม่บังคับกรอก) สร้างข้อความสั้นๆ จากเงื่อนไขโปรแทน */
+function promoDisplayName_(p) {
+  if (p.name) return p.name;
+  if (p.type === 'percent') return 'ลด ' + numFrom(p.value) + '%';
+  if (p.type === 'fixed') return 'ลด ' + numFrom(p.value) + ' บาท';
+  if (p.type === 'bogo') return 'ซื้อ ' + numFrom(p.buy_qty, 1) + ' แถม ' + numFrom(p.free_qty, 1);
+  return 'โปรโมชั่น';
+}
+
+/** รายชื่อโปรโมชั่นที่กำลังใช้งานอยู่ตอนนี้ — ใช้แสดงเป็นแบนเนอร์สั้นๆ ใต้กล่องค้นหาหน้าแรกของลูกค้า */
+function catalogGetActivePromotions() {
+  var now = new Date();
+  var rows = findAll('Promotions', function (p) {
+    if (!boolFrom(p.is_active)) return false;
+    if (p.start_at && toDate(p.start_at) > now) return false;
+    if (p.end_at && toDate(p.end_at) < now) return false;
+    return true;
+  }).sort(function (a, b) { return toDate(b.created_at) - toDate(a.created_at); });
+  return ok(rows.map(function (p) { return { promotion_id: p.promotion_id, name: promoDisplayName_(p), type: p.type }; }));
+}
+
 /**
  * ป้ายโปรโมชั่นแบบย่อสำหรับแสดงหน้าร้าน (ก่อนหยิบใส่ตะกร้า) — คำนวณราคาหลังลดตรงๆ ได้เฉพาะ percent/fixed
  * (bogo ต้องมีจำนวนในตะกร้าก่อนถึงจะรู้ว่าฟรีกี่ชิ้น เลยมีแค่ป้ายข้อความ ไม่มี display_price)
@@ -98,7 +119,10 @@ function applyMixMatchBogoDiscounts_(rows) {
     var groupSize = buyQty + freeQty;
     var totalQty = g.rows.reduce(function (s, r) { return s + r.qty; }, 0);
     var freeUnits = Math.floor(totalQty / groupSize) * freeQty;
-    var label = 'ซื้อ ' + buyQty + ' แถม ' + freeQty + (freeUnits > 0 ? ' (ฟรี ' + freeUnits + ' ชิ้น)' : '');
+    // ยังไม่ครบเงื่อนไขก็บอกยอดสะสมไว้ก่อน ("ไม่บังคับซื้อครบตามโปร" — แค่ให้รู้ว่าใกล้ได้ของแถมแค่ไหน)
+    var label = freeUnits > 0
+      ? 'ซื้อ ' + buyQty + ' แถม ' + freeQty + ' (ได้รับฟรี ' + freeUnits + ' ชิ้น)'
+      : 'ซื้อ ' + buyQty + ' แถม ' + freeQty + ' (สะสมแล้ว ' + totalQty + '/' + groupSize + ' ชิ้น)';
     var remaining = freeUnits;
     g.rows.slice().sort(function (a, b) { return a.unit_price - b.unit_price; }).forEach(function (row) {
       row.promo_label = label;

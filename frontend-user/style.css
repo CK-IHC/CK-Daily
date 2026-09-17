@@ -179,6 +179,11 @@ img { max-width: 100%; display: block; }
 .chip.cancelled { background: #fee2e2; color: #991b1b; }
 .promo-chip { display: inline-block; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: #dc2626; color: #fff; }
 
+/* แถบชื่อโปรโมชั่นที่กำลังใช้งานอยู่ ใต้กล่องค้นหาหน้าแรก */
+.promo-banner-strip { display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px 2px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.promo-banner-strip::-webkit-scrollbar { display: none; }
+.promo-banner-pill { flex: none; background: linear-gradient(135deg,#dc2626,#f97316); color: #fff; font-size: 12px; font-weight: 800; padding: 6px 14px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 6px rgba(220,38,38,.25); }
+
 .timeline { padding: 4px 0; }
 .timeline-step { display: flex; gap: 12px; padding-bottom: 22px; position: relative; }
 .timeline-step:last-child { padding-bottom: 0; }
