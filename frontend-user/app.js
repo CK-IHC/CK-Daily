@@ -56,8 +56,32 @@ var UI = (function () {
 
 var Views = {};
 
+/**
+ * รายชื่อไฟล์สคริปต์ของแต่ละหน้า — โหลดเฉพาะตอนเข้าหน้านั้นจริง (dynamic <script>) แทนการโหลดทุกหน้าล่วงหน้า
+ * ทำให้เปิดแอปครั้งแรกเร็วขึ้น (ไม่ต้องรอดาวน์โหลด JS ของทุกหน้าที่อาจไม่ได้เปิดเลย เช่น หน้าประวัติ/โปรไฟล์)
+ */
+var VIEW_SCRIPTS_ = {
+  home: ['views/home.js'], login: ['views/login.js'], product: ['views/product.js'],
+  cart: ['views/cart.js'], payment: ['views/payment.js'], tracking: ['views/tracking.js'],
+  history: ['views/history.js'], profile: ['views/profile.js'], notifications: ['views/notifications.js']
+};
+var loadedScripts_ = {};
+function loadScript_(src) {
+  if (loadedScripts_[src]) return Promise.resolve();
+  return new Promise(function (resolve, reject) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = function () { loadedScripts_[src] = true; resolve(); };
+    s.onerror = function () { reject(new Error('โหลดสคริปต์ไม่สำเร็จ: ' + src)); };
+    document.body.appendChild(s);
+  });
+}
+function ensureViewScripts_(routeName) {
+  return Promise.all((VIEW_SCRIPTS_[routeName] || []).map(loadScript_));
+}
+
 var Router = (function () {
-  var container, cleanupFn = null;
+  var container, cleanupFn = null, renderToken_ = 0;
   var NAV_ITEMS = [
     { hash: '#/home', icon: 'home', label: 'หน้าแรก' },
     { hash: '#/history', icon: 'history', label: 'ประวัติ' },
@@ -112,10 +136,18 @@ var Router = (function () {
       return;
     }
 
-    var viewFn = Views[route.name] || Views.notFound;
-    container.innerHTML = '';
-    var result = viewFn(container, route.params);
-    if (typeof result === 'function') cleanupFn = result;
+    var token = ++renderToken_;
+    container.innerHTML = UI.loading();
+    ensureViewScripts_(route.name).then(function () {
+      if (token !== renderToken_) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วระหว่างที่ยังโหลดสคริปต์ไม่เสร็จ ไม่ต้อง render ทับ
+      var viewFn = Views[route.name] || Views.notFound;
+      container.innerHTML = '';
+      var result = viewFn(container, route.params);
+      if (typeof result === 'function') cleanupFn = result;
+    }).catch(function (err) {
+      if (token !== renderToken_) return;
+      container.innerHTML = '<div class="empty-state">โหลดหน้านี้ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่<br><span style="font-size:12px;color:var(--text-muted)">' + UI.escapeHtml(err.message) + '</span></div>';
+    });
   }
 
   function start() {

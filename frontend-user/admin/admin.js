@@ -188,8 +188,49 @@ var MENU = [
 var PAGE_TITLES = { dashboard: 'Dashboard', liveDashboard: 'Live Dashboard', orders: 'ออเดอร์ทั้งหมด', kanban: 'Kanban Board', rounds: 'จัดการรอบ', products: 'สินค้า/หมวดหมู่', stock: 'จัดการสต็อก', payments: 'ตรวจสอบสลิป', coupons: 'คูปอง/โปรโมชั่น', promotions: 'โปรโมชั่น', banners: 'แบนเนอร์หน้าแรก', announcements: 'ประกาศหน้าแรก', users: 'ผู้ใช้งาน', reports: 'รายงาน', settings: 'ตั้งค่าร้าน' };
 var PERM_FOR_ROUTE = { dashboard: 'dashboard:view_limited', liveDashboard: 'dashboard:view', orders: 'orders:view', kanban: 'kanban:view', rounds: 'rounds:view', products: 'products:manage', stock: 'stock:manage', payments: 'payments:verify', coupons: 'coupons:manage', promotions: 'promotions:manage', banners: 'banners:manage', announcements: 'announcements:manage', users: 'users:manage', reports: 'reports:view', settings: 'settings:manage' };
 
+/**
+ * รายชื่อไฟล์สคริปต์ของแต่ละหน้า — โหลดเฉพาะตอนเข้าหน้านั้นจริง (dynamic <script>) แทนการโหลดทุกหน้าล่วงหน้า
+ * ทำให้เข้าแอปครั้งแรกเร็วขึ้นมาก (ไม่ต้องรอดาวน์โหลด JS ของทุกหน้าที่อาจไม่ได้เปิดเลย)
+ * บางหน้าต้องพ่วงไฟล์อื่นด้วยเพราะมีฟังก์ชันกลางที่ใช้ร่วมกัน (ดูคอมเมนต์ท้ายบรรทัด):
+ * - dashboard/reports ใช้ charts.js (กราฟ) ร่วมกัน
+ * - kanban/rounds/payments ใช้ฟังก์ชันจาก views/orders.js (openOrderDetailModal, ORDER_STATUS_LIST_, viewSlipInLightbox_ ฯลฯ)
+ * - products ใช้ openStockAdjustModal_ จาก views/stock.js
+ */
+var VIEW_SCRIPTS_ = {
+  login: ['views/login.js'],
+  dashboard: ['charts.js', 'views/orders.js', 'views/dashboard.js'],
+  liveDashboard: ['charts.js', 'views/liveDashboard.js'],
+  orders: ['views/orders.js'],
+  kanban: ['views/orders.js', 'views/kanban.js'],
+  rounds: ['views/orders.js', 'views/rounds.js'],
+  products: ['views/stock.js', 'views/products.js'],
+  stock: ['views/stock.js'],
+  payments: ['views/orders.js', 'views/payments.js'],
+  coupons: ['views/coupons.js'],
+  promotions: ['views/promotions.js'],
+  announcements: ['views/announcements.js'],
+  banners: ['views/banners.js'],
+  users: ['views/users.js'],
+  reports: ['charts.js', 'views/reports.js'],
+  settings: ['views/settings.js']
+};
+var loadedScripts_ = {};
+function loadScript_(src) {
+  if (loadedScripts_[src]) return Promise.resolve();
+  return new Promise(function (resolve, reject) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = function () { loadedScripts_[src] = true; resolve(); };
+    s.onerror = function () { reject(new Error('โหลดสคริปต์ไม่สำเร็จ: ' + src)); };
+    document.body.appendChild(s);
+  });
+}
+function ensureViewScripts_(routeName) {
+  return Promise.all((VIEW_SCRIPTS_[routeName] || []).map(loadScript_));
+}
+
 var Router = (function () {
-  var container, cleanupFn = null;
+  var container, cleanupFn = null, renderToken_ = 0;
 
   function parseHash() {
     var hash = location.hash || '#/orders';
@@ -245,10 +286,18 @@ var Router = (function () {
       document.getElementById('sidebarBackdrop').classList.remove('show');
     }
 
-    var viewFn = Views[route.name] || Views.notFound;
-    container.innerHTML = '';
-    var result = viewFn(container, route.params);
-    if (typeof result === 'function') cleanupFn = result;
+    var token = ++renderToken_;
+    container.innerHTML = UI.loading();
+    ensureViewScripts_(route.name).then(function () {
+      if (token !== renderToken_) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วระหว่างที่ยังโหลดสคริปต์ไม่เสร็จ ไม่ต้อง render ทับ
+      var viewFn = Views[route.name] || Views.notFound;
+      container.innerHTML = '';
+      var result = viewFn(container, route.params);
+      if (typeof result === 'function') cleanupFn = result;
+    }).catch(function (err) {
+      if (token !== renderToken_) return;
+      container.innerHTML = '<div class="empty-state">โหลดหน้านี้ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่<br><span style="font-size:12px;color:var(--text-muted)">' + UI.escapeHtml(err.message) + '</span></div>';
+    });
   }
 
   function start() {
