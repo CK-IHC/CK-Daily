@@ -37,7 +37,7 @@ Views.promotions = function (container) {
     el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>สินค้าที่ร่วมโปร</th><th>ชื่อโปร</th><th>ประเภท</th><th>ส่วนลด</th><th>ช่วงเวลา</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>' +
       promotions.map(function (p) {
         var period = (p.start_at || p.end_at) ? (UI.fmtTime(p.start_at) || 'ตอนนี้') + ' – ' + (UI.fmtTime(p.end_at) || 'ไม่กำหนด') : 'ตลอดไป';
-        return '<tr><td style="max-width:260px;font-size:12.5px">' + UI.escapeHtml((p.product_names || []).join(', ')) + '</td><td>' + UI.escapeHtml(p.name || '-') + '</td>' +
+        return '<tr><td style="max-width:260px;font-size:12.5px;white-space:normal;word-break:break-word">' + UI.escapeHtml((p.product_names || []).join(', ')) + '</td><td>' + UI.escapeHtml(p.name || '-') + '</td>' +
           '<td>' + PROMOTION_TYPE_LABEL_[p.type] + '</td><td>' + valueLabel_(p) + '</td><td style="font-size:12px">' + period + '</td>' +
           '<td><span class="chip ' + (p.is_active ? 'active' : 'cancelled') + '">' + (p.is_active ? 'เปิด' : 'ปิด') + '</span></td>' +
           '<td><button class="btn btn-sm btn-outline" data-edit="' + p.promotion_id + '">แก้ไข</button> <button class="btn btn-sm btn-danger" data-del="' + p.promotion_id + '">ลบ</button></td></tr>';
