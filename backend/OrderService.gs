@@ -63,55 +63,76 @@ function orderCreate(payload, token) {
     throw new ApiError('E_INVALID_PAYLOAD', 'วิธีชำระเงินไม่ถูกต้อง', 'payment_method');
   }
 
+  // client_order_id (สร้างฝั่ง frontend ครั้งเดียวต่อการกดสั่งซื้อ 1 ครั้ง คงค่าเดิมไว้ถ้าต้อง retry)
+  // กันออเดอร์ซ้ำซ้อนตอนเครือข่ายช้า/timeout แล้วลูกค้ากดสั่งซื้อซ้ำ ทั้งที่ออเดอร์แรกเข้าระบบไปแล้วจริง
+  var clientOrderId = String(payload.client_order_id || '').slice(0, 100);
+
   var lock = LockService.getScriptLock();
   var acquired = lock.tryLock(30000);
   if (!acquired) throw new ApiError('E_SERVER', 'ระบบกำลังประมวลผลคำสั่งซื้ออื่นอยู่ กรุณาลองใหม่อีกครั้ง');
 
+  var order, isDuplicate = false;
   try {
-    var round = getRoundOrThrow_(payload.round_id);
-    assertRoundOpenForOrder_(round);
+    if (clientOrderId) {
+      var existing = findOne('Orders', function (r) { return r.user_id === auth.user.user_id && r.client_order_id === clientOrderId; }, true);
+      if (existing) { order = existing; isDuplicate = true; }
+    }
 
-    // คำนวณราคาจริงใหม่ทั้งหมดภายใน Lock (strict) — ห้ามเชื่อราคา/สต็อกจาก client เด็ดขาด
-    var totals = computeOrderTotals_(payload.items, payload.order_type, payload.coupon_code, auth.user.user_id, true);
+    if (!isDuplicate) {
+      var round = getRoundOrThrow_(payload.round_id);
+      assertRoundOpenForOrder_(round);
 
-    var idPair = genOrderId();
-    var isTransferLike = paymentMethod === 'transfer' || paymentMethod === 'promptpay';
-    var order = {
-      order_id: idPair.order_id, order_no: idPair.order_no, user_id: auth.user.user_id, phone: auth.user.phone,
-      customer_name: auth.user.name || auth.user.phone, round_id: round.round_id, order_type: payload.order_type,
-      address: payload.order_type === 'delivery' ? String(payload.address) : '', delivery_note: String(payload.delivery_note || '').slice(0, 300),
-      subtotal: totals.subtotal, discount: totals.discount, coupon_code: payload.coupon_code || '',
-      delivery_fee: totals.delivery_fee, vat: totals.vat, grand_total: totals.grand_total,
-      payment_method: paymentMethod, payment_status: isTransferLike ? 'pending_verify' : 'unpaid',
-      slip_url: payload.slip_url || '', status: 'pending', cancel_reason: '',
-      placed_at: fmtDateTime(new Date()), confirmed_at: '', ready_at: '', completed_at: '', staff_id: ''
-    };
-    insertRow('Orders', order);
+      // คำนวณราคาจริงใหม่ทั้งหมดภายใน Lock (strict) — ห้ามเชื่อราคา/สต็อกจาก client เด็ดขาด
+      var totals = computeOrderTotals_(payload.items, payload.order_type, payload.coupon_code, auth.user.user_id, true);
 
-    var itemRows = totals.items.map(function (i) {
-      return {
-        item_id: genId('ITM'), order_id: order.order_id, order_no: order.order_no, product_id: i.product_id, sku: i.sku || '',
-        customer_name: order.customer_name, user_id: order.user_id, phone: order.phone, category_id: i.category_id || '', product_name: i.product_name,
-        options_json: i.options_json, unit_price: i.unit_price, qty: i.qty, line_total: i.line_total, note: i.note
+      var idPair = genOrderId();
+      var isTransferLike = paymentMethod === 'transfer' || paymentMethod === 'promptpay';
+      order = {
+        order_id: idPair.order_id, order_no: idPair.order_no, user_id: auth.user.user_id, phone: auth.user.phone,
+        customer_name: auth.user.name || auth.user.phone, round_id: round.round_id, order_type: payload.order_type,
+        address: payload.order_type === 'delivery' ? String(payload.address) : '', delivery_note: String(payload.delivery_note || '').slice(0, 300),
+        subtotal: totals.subtotal, discount: totals.discount, coupon_code: payload.coupon_code || '',
+        delivery_fee: totals.delivery_fee, vat: totals.vat, grand_total: totals.grand_total,
+        payment_method: paymentMethod, payment_status: isTransferLike ? 'pending_verify' : 'unpaid',
+        slip_url: payload.slip_url || '', status: 'pending', cancel_reason: '',
+        placed_at: fmtDateTime(new Date()), confirmed_at: '', ready_at: '', completed_at: '', staff_id: '',
+        client_order_id: clientOrderId
       };
-    });
-    insertRows('OrderItems', itemRows);
+      insertRow('Orders', order);
 
-    // ตัดสต็อกทีละสินค้า — ทุกจุดนี้อยู่ภายใน Lock เดียวกัน + invalidate cache ทันทีทุกครั้งที่เขียน กัน overselling
-    itemRows.forEach(function (i) {
-      deductStock_(i.product_id, i.qty, 'order', order.order_id, auth.user.user_id);
-    });
+      var itemRows = totals.items.map(function (i) {
+        return {
+          item_id: genId('ITM'), order_id: order.order_id, order_no: order.order_no, product_id: i.product_id, sku: i.sku || '',
+          customer_name: order.customer_name, user_id: order.user_id, phone: order.phone, category_id: i.category_id || '', product_name: i.product_name,
+          options_json: i.options_json, unit_price: i.unit_price, qty: i.qty, line_total: i.line_total, note: i.note
+        };
+      });
+      insertRows('OrderItems', itemRows);
 
-    updateRowAt('Rounds', round.__row, { current_orders: numFrom(round.current_orders) + 1 });
-    if (payload.coupon_code) incrementCouponUsage_(payload.coupon_code);
+      // ตัดสต็อกทีละสินค้า — ทุกจุดนี้อยู่ภายใน Lock เดียวกัน กัน overselling — พักรายการ StockMovements ไว้
+      // เขียนรวดเดียวหลังตัดครบ (batch) แทนการ insertRow ทีละชิ้น ลดจำนวนครั้งที่ยิง Sheets API ตอนถือ Lock
+      var movements = [];
+      itemRows.forEach(function (i) {
+        deductStock_(i.product_id, i.qty, 'order', order.order_id, auth.user.user_id, movements);
+      });
+      if (movements.length) insertRows('StockMovements', movements);
 
-    writeAudit(auth.user.user_id, auth.user.role, 'create', 'Order', order.order_id, null, order);
-    notifyOrderEvent_(order, 'created');
-
-    return ok(publicOrder_(order), 'สั่งซื้อสำเร็จ');
+      updateRowAt('Rounds', round.__row, { current_orders: numFrom(round.current_orders) + 1 }, round);
+      if (payload.coupon_code) incrementCouponUsage_(payload.coupon_code);
+    }
   } finally {
     lock.releaseLock();
   }
+
+  // audit log + แจ้งเตือน (บันทึกในแอป + LINE Notify ร้าน) ไม่กระทบความถูกต้องของสต็อก/จำนวนรับออเดอร์
+  // ย้ายมาทำ "หลังปล่อย Lock" แล้ว (โดยเฉพาะ LINE Notify ที่ยิง request ออกอินเทอร์เน็ต ช้าไม่แน่นอน)
+  // กันคิวคนสั่งซื้อคนถัดไปต้องรอ เวลารวมต่อออเดอร์ที่ถือ Lock อยู่จะสั้นลงมากตอนเปิดขายคนแห่กันสั่งพร้อมกัน
+  if (!isDuplicate) {
+    writeAudit(auth.user.user_id, auth.user.role, 'create', 'Order', order.order_id, null, order);
+    notifyOrderEvent_(order, 'created');
+  }
+
+  return ok(publicOrder_(order), 'สั่งซื้อสำเร็จ');
 }
 
 /** ===================== order.uploadSlip ===================== */

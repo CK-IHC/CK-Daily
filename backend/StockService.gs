@@ -10,8 +10,13 @@ function writeStockMovement_(productId, sku, type, qtyChange, qtyBefore, qtyAfte
   });
 }
 
-/** ตัดสต็อกสินค้าเดียว คืน product ที่อัปเดตแล้ว — เรียกเฉพาะภายใน LockService ของผู้เรียก */
-function deductStock_(productId, qty, refType, refId, byUserId) {
+/**
+ * ตัดสต็อกสินค้าเดียว คืน product ที่อัปเดตแล้ว — เรียกเฉพาะภายใน LockService ของผู้เรียก
+ * movementsBuffer (optional): ถ้าส่งเข้ามา จะพักรายการ StockMovements ไว้ในนี้แทนการ insertRow ทันที
+ * ให้ผู้เรียก insertRows แบบ batch ครั้งเดียวหลังตัดสต็อกครบทุกชิ้น (ใช้ตอน order.create ที่มีหลายรายการ
+ * ในออเดอร์เดียว ลดจำนวนครั้งที่ยิง Sheets API ตอนถือ LockService อยู่)
+ */
+function deductStock_(productId, qty, refType, refId, byUserId, movementsBuffer) {
   var p = findOne('Products', function (r) { return r.product_id === productId; }, true);
   if (!p) throw new ApiError('E_INVALID_PAYLOAD', 'ไม่พบสินค้า: ' + productId, 'product_id');
   if (!boolFrom(p.track_stock)) return p;
@@ -20,8 +25,9 @@ function deductStock_(productId, qty, refType, refId, byUserId) {
     throw new ApiError('E_STOCK_INSUFFICIENT', 'สินค้า "' + p.name + '" คงเหลือไม่พอ (เหลือ ' + before + ')', 'product_id');
   }
   var after = before - qty;
-  var updated = updateRowAt('Products', p.__row, { stock_qty: after });
-  writeStockMovement_(productId, p.sku, 'out', -qty, before, after, refType, refId, '', byUserId);
+  var updated = updateRowAt('Products', p.__row, { stock_qty: after }, p);
+  var movement = { movement_id: genId('MOV'), product_id: productId, sku: p.sku || '', type: 'out', qty_change: -qty, qty_before: before, qty_after: after, ref_type: refType, ref_id: refId || '', reason: '', by_user_id: byUserId || '' };
+  if (movementsBuffer) movementsBuffer.push(movement); else insertRow('StockMovements', movement);
   return updated;
 }
 

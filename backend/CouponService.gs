@@ -101,5 +101,5 @@ function adminCouponsDelete(payload, token) {
 function incrementCouponUsage_(code) {
   if (!code) return;
   var c = findOne('Coupons', function (r) { return r.code === code; }, true);
-  if (c) updateRowAt('Coupons', c.__row, { used_count: numFrom(c.used_count) + 1 });
+  if (c) updateRowAt('Coupons', c.__row, { used_count: numFrom(c.used_count) + 1 }, c);
 }

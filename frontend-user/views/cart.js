@@ -193,11 +193,13 @@ Views.cart = function (container) {
       return Api.call('order.create', {
         items: State.cart.map(function (i) { return { product_id: i.product_id, qty: i.qty, options: i.options, note: i.note }; }),
         round_id: State.roundId, order_type: CART_ORDER_TYPE_,
-        coupon_code: State.couponCode, payment_method: CART_PAYMENT_METHOD_, delivery_note: State.deliveryNote
+        coupon_code: State.couponCode, payment_method: CART_PAYMENT_METHOD_, delivery_note: State.deliveryNote,
+        client_order_id: State.getPendingOrderId() // กันสั่งซื้อซ้ำถ้าเน็ตช้า/timeout แล้วต้องกดใหม่ — เคลียร์ทิ้งตอนสำเร็จด้านล่าง
       });
     }).then(function (order) {
       if (!order) return;
       State.clearCart();
+      State.clearPendingOrderId();
       State.deliveryNote = '';
       UI.toast('สั่งซื้อสำเร็จ!', 'success');
       location.hash = '#/payment/' + order.order_id;

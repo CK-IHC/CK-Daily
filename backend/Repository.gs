@@ -11,7 +11,7 @@ var SHEET_SCHEMAS = {
   Products: ['product_id', 'sku', 'name', 'category_id', 'description', 'image_url', 'cost_price', 'price', 'unit', 'track_stock', 'stock_qty', 'reorder_point', 'max_per_order', 'has_options', 'is_active', 'sort_order', 'created_at', 'updated_at', 'is_deleted', 'is_frozen'],
   ProductOptions: ['option_id', 'product_id', 'group_name', 'option_name', 'price_delta', 'is_required', 'max_select', 'stock_link_product_id', 'created_at', 'updated_at', 'is_deleted'],
   Rounds: ['round_id', 'round_name', 'open_at', 'close_at', 'delivery_at', 'status', 'capacity', 'current_orders', 'note', 'created_at', 'updated_at', 'is_deleted', 'delivery_location'],
-  Orders: ['order_id', 'order_no', 'user_id', 'phone', 'customer_name', 'round_id', 'order_type', 'address', 'delivery_note', 'subtotal', 'discount', 'coupon_code', 'delivery_fee', 'vat', 'grand_total', 'payment_method', 'payment_status', 'slip_url', 'slip_urls', 'status', 'cancel_reason', 'placed_at', 'confirmed_at', 'ready_at', 'completed_at', 'staff_id', 'created_at', 'updated_at', 'is_deleted', 'photo_url', 'admin_note'],
+  Orders: ['order_id', 'order_no', 'user_id', 'phone', 'customer_name', 'round_id', 'order_type', 'address', 'delivery_note', 'subtotal', 'discount', 'coupon_code', 'delivery_fee', 'vat', 'grand_total', 'payment_method', 'payment_status', 'slip_url', 'slip_urls', 'status', 'cancel_reason', 'placed_at', 'confirmed_at', 'ready_at', 'completed_at', 'staff_id', 'created_at', 'updated_at', 'is_deleted', 'photo_url', 'admin_note', 'client_order_id'],
   OrderItems: ['item_id', 'order_id', 'order_no', 'product_id', 'sku', 'customer_name', 'user_id', 'phone', 'category_id', 'product_name', 'options_json', 'unit_price', 'qty', 'line_total', 'note', 'created_at', 'updated_at', 'is_deleted'],
   StockMovements: ['movement_id', 'product_id', 'sku', 'type', 'qty_change', 'qty_before', 'qty_after', 'ref_type', 'ref_id', 'reason', 'by_user_id', 'created_at'],
   Coupons: ['coupon_id', 'code', 'type', 'value', 'min_spend', 'max_discount', 'usage_limit', 'used_count', 'per_user_limit', 'start_at', 'end_at', 'is_active', 'created_at', 'updated_at', 'is_deleted'],
@@ -22,11 +22,12 @@ var SHEET_SCHEMAS = {
   Settings: ['key', 'value', 'description'],
   Announcements: ['announcement_id', 'text', 'link_url', 'image_url', 'size', 'sort_order', 'is_active', 'start_at', 'end_at', 'created_at', 'updated_at', 'is_deleted'],
   Banners: ['banner_id', 'image_url', 'link_url', 'sort_order', 'is_active', 'start_at', 'end_at', 'created_at', 'updated_at', 'is_deleted'],
-  Orders_Archive: ['order_id', 'order_no', 'user_id', 'phone', 'customer_name', 'round_id', 'order_type', 'address', 'delivery_note', 'subtotal', 'discount', 'coupon_code', 'delivery_fee', 'vat', 'grand_total', 'payment_method', 'payment_status', 'slip_url', 'slip_urls', 'status', 'cancel_reason', 'placed_at', 'confirmed_at', 'ready_at', 'completed_at', 'staff_id', 'created_at', 'updated_at', 'is_deleted', 'photo_url', 'admin_note']
+  Orders_Archive: ['order_id', 'order_no', 'user_id', 'phone', 'customer_name', 'round_id', 'order_type', 'address', 'delivery_note', 'subtotal', 'discount', 'coupon_code', 'delivery_fee', 'vat', 'grand_total', 'payment_method', 'payment_status', 'slip_url', 'slip_urls', 'status', 'cancel_reason', 'placed_at', 'confirmed_at', 'ready_at', 'completed_at', 'staff_id', 'created_at', 'updated_at', 'is_deleted', 'photo_url', 'admin_note', 'client_order_id']
 };
 
-// TTL (วินาที) — Users/Rounds cache สั้นๆ เพื่อความไวโดยยังทันความเปลี่ยนแปลง (ทุกจุดเขียนข้อมูล invalidate cache ทันทีอยู่แล้ว)
-var CACHEABLE_SHEETS = { Categories: 300, Products: 300, ProductOptions: 300, Settings: 300, Users: 30, Rounds: 15 };
+// TTL (วินาที) — Users/Rounds/Sessions cache สั้นๆ เพื่อความไวโดยยังทันความเปลี่ยนแปลง (ทุกจุดเขียนข้อมูล invalidate cache ทันทีอยู่แล้ว)
+// Sessions ถูกอ่านแทบทุก request ที่ login แล้ว (requireAuth) — cache ไว้สั้นๆ ลดโหลด Sheets ตอนคนเข้าใช้งานพร้อมกันเยอะได้มาก
+var CACHEABLE_SHEETS = { Categories: 300, Products: 300, ProductOptions: 300, Settings: 300, Users: 30, Rounds: 15, Sessions: 20 };
 
 /**
  * ถ้า Sheet ที่รู้จักใน SHEET_SCHEMAS (เช่น เพิ่งเพิ่มชีตใหม่ในโค้ด) ยังไม่มีอยู่จริงในสเปรดชีต
@@ -165,13 +166,21 @@ function insertRows(name, objs) {
   return objs;
 }
 
-/** อัปเดตแถวด้วยเลขแถวจริง (จาก __row ที่ readAll แนบมาให้) เร็วกว่าค้นหาใหม่ */
-function updateRowAt(name, rowIndex, patch) {
+/**
+ * อัปเดตแถวด้วยเลขแถวจริง (จาก __row ที่ readAll แนบมาให้) เร็วกว่าค้นหาใหม่
+ * knownRow (optional): ถ้าผู้เรียกมี object ของแถวนี้ครบทุกคอลัมน์อยู่แล้วในมือ (เพิ่งอ่านมาสดๆ ในการรัน
+ * เดียวกัน เช่น จาก findOne ก่อนหน้าบรรทัดนี้ไม่กี่บรรทัด) ส่งเข้ามาเพื่อข้ามการอ่านชีตซ้ำ (getValues) ก่อนเขียน
+ * ลดจำนวนครั้งที่ยิง Sheets API ต่อการอัปเดตหนึ่งครั้งจาก 2 เหลือ 1 — สำคัญมากตอนมีคนสั่งซื้อพร้อมกันเยอะๆ
+ * เพราะ order.create ทำงานใน LockService เดียวกันทั้งหมด ยิ่งแต่ละคำสั่งซื้อเสร็จเร็ว คิวคนถัดไปก็ยิ่งไม่ต้องรอนาน
+ */
+function updateRowAt(name, rowIndex, patch, knownRow) {
   var sh = getSheet(name);
   var headers = actualHeaders_(name, sh);
   headers = ensureColumns_(name, sh, headers, Object.keys(patch));
   if (headers.indexOf('updated_at') > -1) patch.updated_at = nowIso_();
-  var current = sh.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+  var current = knownRow
+    ? headers.map(function (h) { return knownRow[h] === undefined ? '' : knownRow[h]; })
+    : sh.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
   var clean = sanitizeObject(patch);
   headers.forEach(function (h, i) {
     if (clean.hasOwnProperty(h)) current[i] = clean[h];

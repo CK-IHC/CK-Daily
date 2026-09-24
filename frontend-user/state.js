@@ -9,13 +9,21 @@ var State = (function () {
       var raw = localStorage.getItem(KEY);
       if (raw) return JSON.parse(raw);
     } catch (e) { /* ignore */ }
-    return { token: null, user: null, cart: [], roundId: null, orderType: 'pickup', address: '', couponCode: '', paymentMethod: 'cash', deliveryNote: '' };
+    return { token: null, user: null, cart: [], roundId: null, orderType: 'pickup', address: '', couponCode: '', paymentMethod: 'cash', deliveryNote: '', pendingOrderId: '' };
   }
 
   var data = load();
 
   function save() {
     localStorage.setItem(KEY, JSON.stringify(data));
+  }
+
+  function genUuid_() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
   }
 
   return {
@@ -63,6 +71,17 @@ var State = (function () {
     },
     removeFromCart: function (index) { data.cart.splice(index, 1); save(); },
     clearCart: function () { data.cart = []; save(); },
-    replaceCart: function (items) { data.cart = items; save(); }
+    replaceCart: function (items) { data.cart = items; save(); },
+
+    /**
+     * รหัสอ้างอิงการสั่งซื้อฝั่ง client (กัน order ซ้ำซ้อนตอนเครือข่ายช้า/timeout แล้วกดสั่งซื้อซ้ำ) —
+     * สร้างครั้งเดียวแล้วคงค่าเดิมไว้จนกว่าจะสั่งซื้อสำเร็จ (ให้ retry รอบถัดๆ ไปยังใช้รหัสเดิม backend
+     * จะรู้ว่าเป็นคำสั่งซื้อเดียวกัน ไม่สร้างออเดอร์ซ้ำ) เคลียร์ทิ้งหลังสั่งซื้อสำเร็จ (ดู clearCart ที่เรียกคู่กัน)
+     */
+    getPendingOrderId: function () {
+      if (!data.pendingOrderId) { data.pendingOrderId = genUuid_(); save(); }
+      return data.pendingOrderId;
+    },
+    clearPendingOrderId: function () { data.pendingOrderId = ''; save(); }
   };
 })();
