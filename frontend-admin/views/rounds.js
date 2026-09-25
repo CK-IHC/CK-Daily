@@ -1,6 +1,9 @@
 /**
  * views/rounds.js — จัดการรอบ + ใบสรุปการผลิต + bulk update สถานะทั้งรอบ
  */
+var ROUND_STATUS_LIST_ = ['draft', 'open', 'closed', 'preparing', 'delivering', 'completed', 'cancelled'];
+var ROUND_STATUS_LABEL_ = { draft: 'ร่าง', open: 'เปิดรับ', closed: 'ปิดรับ', preparing: 'กำลังเตรียม', delivering: 'กำลังส่ง/รับ', completed: 'สำเร็จ', cancelled: 'ยกเลิก' };
+
 Views.rounds = function (container) {
   var rounds = [];
 
@@ -39,11 +42,27 @@ Views.rounds = function (container) {
         if (action === 'delete') doDelete(id);
       };
     });
+    // แก้ไขสถานะรอบเองได้อิสระ (เผื่อกรณีปุ่มลัดด้านบนไม่ครอบคลุม เช่น ต้องการย้อนสถานะกลับ) — ตรงกับฝั่ง
+    // backend ที่เปิดให้เปลี่ยนสถานะข้ามไปมาได้ทุกทิศทางแล้วเหมือนกับหน้าออเดอร์ทั้งหมด
+    el.querySelectorAll('.statusSelect').forEach(function (sel) {
+      sel.onchange = function () {
+        if (!sel.value) return;
+        doSetStatus(sel.dataset.id, sel.value);
+        sel.value = '';
+      };
+    });
     UI.makeTableSortable(el.querySelector('table'));
   }
 
+  function statusSelectHtml_(r) {
+    var options = ROUND_STATUS_LIST_.filter(function (s) { return s !== r.status; })
+      .map(function (s) { return '<option value="' + s + '">' + ROUND_STATUS_LABEL_[s] + '</option>'; }).join('');
+    return '<select class="form-control statusSelect" data-id="' + r.round_id + '" style="width:auto;display:inline-block"><option value="">แก้ไขสถานะ...</option>' + options + '</select> ';
+  }
+
   function roundActions(r) {
-    var buttons = '<button class="btn btn-sm btn-outline" data-action="detail" data-id="' + r.round_id + '">รายละเอียด</button> ' +
+    var buttons = statusSelectHtml_(r) +
+      '<button class="btn btn-sm btn-outline" data-action="detail" data-id="' + r.round_id + '">รายละเอียด</button> ' +
       '<button class="btn btn-sm btn-outline" data-action="edit" data-id="' + r.round_id + '">แก้ไข</button> ';
     if (r.status === 'draft') buttons += '<button class="btn btn-sm btn-primary" data-action="open" data-id="' + r.round_id + '">เปิดรอบ</button> ';
     if (r.status === 'open') buttons += '<button class="btn btn-sm btn-danger" data-action="close" data-id="' + r.round_id + '">ปิดรับ</button> ';

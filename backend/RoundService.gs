@@ -72,13 +72,14 @@ function adminRoundsUpdate(payload, token) {
   return ok(publicRound_(updated), 'บันทึกรอบแล้ว');
 }
 
-// closed -> open: เผื่อรอบที่ปิดรับไปแล้ว (ปิดเองหรือหมดเวลา) แต่ของยังเหลือ/อยากเปิดรับออเดอร์เพิ่ม
-// แอดมินกด "เปิดรอบ" ซ้ำได้ — ถ้าเวลา "ปิดรับ" เดิมผ่านไปแล้ว ต้องกดแก้ไขรอบเพื่อเลื่อนเวลาปิดรับใหม่ด้วย
-// ไม่งั้นระบบจะยังบล็อกลูกค้าสั่งซื้อตามเวลาเดิมอยู่ (ดู assertRoundOpenForOrder_)
-var ROUND_TRANSITIONS = {
-  draft: ['open', 'cancelled'], open: ['closed', 'cancelled'], closed: ['open', 'preparing', 'cancelled'],
-  preparing: ['delivering', 'cancelled'], delivering: ['completed'], completed: [], cancelled: []
-};
+// เปลี่ยนสถานะรอบได้อิสระทุกทิศทาง (ตามคำขอให้แอดมินแก้ไขสถานะเองได้ เผื่อกรณีปุ่มลัดไม่ครอบคลุม เช่น
+// รอบปิดรับไปแล้วแต่ของยังเหลืออยากเปิดรับเพิ่ม หรือกดสถานะผิดพลาดแล้วอยากย้อนกลับ) — เหมือนกับ ORDER_TRANSITIONS
+// ของออเดอร์ที่ทำไว้ก่อนหน้านี้ — ถ้าเปิดรอบที่เวลา "ปิดรับ" เดิมผ่านไปแล้ว ต้องแก้ไขรอบเพื่อเลื่อนเวลาปิดรับ
+// ใหม่ด้วย ไม่งั้นระบบจะยังบล็อกลูกค้าสั่งซื้อตามเวลาเดิมอยู่ (ดู assertRoundOpenForOrder_)
+var ROUND_TRANSITIONS = ROUND_STATUSES.reduce(function (m, s) {
+  m[s] = ROUND_STATUSES.filter(function (x) { return x !== s; });
+  return m;
+}, {});
 
 function transitionRound_(round, toStatus, auth) {
   var allowed = ROUND_TRANSITIONS[round.status] || [];
