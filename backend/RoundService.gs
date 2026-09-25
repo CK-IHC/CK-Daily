@@ -72,8 +72,11 @@ function adminRoundsUpdate(payload, token) {
   return ok(publicRound_(updated), 'บันทึกรอบแล้ว');
 }
 
+// closed -> open: เผื่อรอบที่ปิดรับไปแล้ว (ปิดเองหรือหมดเวลา) แต่ของยังเหลือ/อยากเปิดรับออเดอร์เพิ่ม
+// แอดมินกด "เปิดรอบ" ซ้ำได้ — ถ้าเวลา "ปิดรับ" เดิมผ่านไปแล้ว ต้องกดแก้ไขรอบเพื่อเลื่อนเวลาปิดรับใหม่ด้วย
+// ไม่งั้นระบบจะยังบล็อกลูกค้าสั่งซื้อตามเวลาเดิมอยู่ (ดู assertRoundOpenForOrder_)
 var ROUND_TRANSITIONS = {
-  draft: ['open', 'cancelled'], open: ['closed', 'cancelled'], closed: ['preparing', 'cancelled'],
+  draft: ['open', 'cancelled'], open: ['closed', 'cancelled'], closed: ['open', 'preparing', 'cancelled'],
   preparing: ['delivering', 'cancelled'], delivering: ['completed'], completed: [], cancelled: []
 };
 

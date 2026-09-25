@@ -47,7 +47,10 @@ Views.rounds = function (container) {
       '<button class="btn btn-sm btn-outline" data-action="edit" data-id="' + r.round_id + '">แก้ไข</button> ';
     if (r.status === 'draft') buttons += '<button class="btn btn-sm btn-primary" data-action="open" data-id="' + r.round_id + '">เปิดรอบ</button> ';
     if (r.status === 'open') buttons += '<button class="btn btn-sm btn-danger" data-action="close" data-id="' + r.round_id + '">ปิดรับ</button> ';
-    if (r.status === 'closed') buttons += '<button class="btn btn-sm btn-primary" data-action="preparing" data-id="' + r.round_id + '">เริ่มเตรียม</button> ';
+    // รอบที่ปิดรับไปแล้ว (ปิดเองหรือหมดเวลา) เปิดรับออเดอร์เพิ่มได้อีกครั้ง — ถ้าเวลา "ปิดรับ" เดิมผ่านไปแล้ว
+    // ต้องกด "แก้ไข" เลื่อนเวลาปิดรับใหม่ด้วย ไม่งั้นลูกค้าจะยังสั่งซื้อไม่ได้ตามเวลาเดิม
+    if (r.status === 'closed') buttons += '<button class="btn btn-sm btn-primary" data-action="open" data-id="' + r.round_id + '">เปิดรอบอีกครั้ง</button> ' +
+      '<button class="btn btn-sm btn-outline" data-action="preparing" data-id="' + r.round_id + '">เริ่มเตรียม</button> ';
     if (r.status === 'preparing') buttons += '<button class="btn btn-sm btn-primary" data-action="delivering" data-id="' + r.round_id + '">เริ่มจัดส่ง/รับ</button> ';
     if (r.status === 'delivering') buttons += '<button class="btn btn-sm btn-primary" data-action="completed" data-id="' + r.round_id + '">ปิดรอบ (สำเร็จ)</button> ';
     if (r.status === 'draft') buttons += '<button class="btn btn-sm btn-danger" data-action="delete" data-id="' + r.round_id + '">ลบ</button>';
