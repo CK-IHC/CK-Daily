@@ -429,8 +429,12 @@ function adminOrdersList(payload, token) {
   requireRole(token, ['staff', 'manager', 'admin']);
   payload = payload || {};
   var allActive = findAll('Orders', null); // อ่านทั้งชีตครั้งเดียว ใช้ทั้งกรองรายการและคำนวณจำนวนครั้งที่สั่งของแต่ละเบอร์
-  var rows = allActive.filter(function (o) { return orderMatchesFilters_(o, payload); })
-    .sort(function (a, b) { return toDate(b.placed_at) - toDate(a.placed_at); });
+  // ซ่อนออเดอร์ที่ถูกยกเลิกจากแท็บ "รายการ"/"รายละเอียด" เสมอ (ทั้งสองแท็บเรียก endpoint นี้เหมือนกัน) —
+  // มีแท็บ "ยกเลิก" แยกต่างหากไว้ดูโดยเฉพาะแล้ว ยกเว้นถ้ากรองสถานะเป็น "ยกเลิก" ตรงๆ (แท็บยกเลิกใช้ทางนี้) ก็ยังดูได้
+  var rows = allActive.filter(function (o) {
+    if (payload.status !== 'cancelled' && normalizeOrderStatus_(o.status) === 'cancelled') return false;
+    return orderMatchesFilters_(o, payload);
+  }).sort(function (a, b) { return toDate(b.placed_at) - toDate(a.placed_at); });
 
   var page = numFrom(payload.page, 1), pageSize = numFrom(payload.page_size, 30);
   var start = (page - 1) * pageSize;
