@@ -1,6 +1,6 @@
 {
-  "rewrites": [
-    { "source": "/admin", "destination": "/admin/index.html" }
+  "redirects": [
+    { "source": "/admin", "destination": "/admin/", "permanent": false }
   ],
   "headers": [
     { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
