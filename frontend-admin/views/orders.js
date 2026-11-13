@@ -549,13 +549,16 @@ Views.orders = function (container) {
   Api.call('admin.rounds.list').then(function (data) {
     rounds = data;
     wireRoundCombo_();
-    // ค่าเริ่มต้น: ถ้ามีรอบที่เปิดรับออเดอร์อยู่ตอนนี้ ให้กรองเฉพาะรอบนั้นตั้งแต่เข้าหน้าเลย แทนที่จะดึง
-    // ออเดอร์ทุกรอบตั้งแต่อดีตมาแสดงทั้งหมด (ชีต Orders ยิ่งใช้งานนานยิ่งมีข้อมูลเยอะ โหลดช้าโดยไม่จำเป็น)
-    var openRound = rounds.filter(function (r) { return r.is_open_for_order; })[0];
-    if (openRound) {
-      filters.round_id = openRound.round_id;
+    // ค่าเริ่มต้น: กรองเฉพาะ "รอบล่าสุด" เสมอตั้งแต่เข้าหน้า แทนที่จะดึงออเดอร์ทุกรอบตั้งแต่อดีตมาแสดงทั้งหมด
+    // (ชีต Orders ยิ่งใช้งานนานยิ่งมีข้อมูลเยอะ โหลดช้าโดยไม่จำเป็น) — เดิมใช้ "รอบที่เปิดรับออเดอร์อยู่ตอนนี้"
+    // แต่ถ้าอยู่ระหว่างรอบ (รอบล่าสุดปิดรับไปแล้ว รอบใหม่ยังไม่เปิด) จะไม่มีรอบไหนเข้าเงื่อนไขเลย กลายเป็นดึง
+    // ออเดอร์ทั้งหมดมาแสดงเหมือนเดิม — admin.rounds.list เรียงจากรอบใหม่สุดไปเก่าสุดอยู่แล้ว ใช้ rounds[0]
+    // (รอบล่าสุดตามเวลาเปิดรอบ) เป็นค่าเริ่มต้นได้ตรงๆ ไม่ว่ารอบนั้นจะยังเปิดรับอยู่หรือปิดไปแล้วก็ตาม
+    var latestRound = rounds[0];
+    if (latestRound) {
+      filters.round_id = latestRound.round_id;
       var input = document.getElementById('fRoundInput'), hidden = document.getElementById('fRoundValue');
-      if (input && hidden) { input.value = openRound.round_name; hidden.value = openRound.round_id; }
+      if (input && hidden) { input.value = latestRound.round_name; hidden.value = latestRound.round_id; }
     }
     load();
   }).catch(function () { load(); });
