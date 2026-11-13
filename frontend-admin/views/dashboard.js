@@ -95,7 +95,7 @@ Views.dashboard = function (container) {
         '<label style="font-size:12px;color:var(--text-muted)">จาก <input id="salesDateFrom" type="date" class="form-control"></label>' +
         '<label style="font-size:12px;color:var(--text-muted)">ถึง <input id="salesDateTo" type="date" class="form-control"></label>' +
         '<button id="btnPrintSales" class="btn btn-outline btn-sm">🖨️ พิมพ์</button></div></div>' +
-        '<canvas id="salesChart" height="140"></canvas></div>' +
+        '<canvas id="salesChart" height="220"></canvas></div>' +
       '<div class="card"><h3 id="itemChartTitle">ยอดขายแยกรายสินค้า (Top 10) — ปี ' + selectedYear + '</h3><div id="itemChartArea"><canvas id="itemChart" height="100"></canvas></div></div>' +
       '<div class="card"><h3>ยอดขายแยกรายรอบ</h3><div id="roundSalesArea">' + UI.loading() + '</div></div>' +
       '<div class="card"><div class="card-head"><h3>ออเดอร์ที่ต้องดำเนินการ</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintAction">🖨️ พิมพ์</button></div><div id="actionOrders">' + UI.loading() + '</div></div>';

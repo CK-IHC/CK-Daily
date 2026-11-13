@@ -76,7 +76,7 @@ Views.liveDashboard = function (container) {
             '<label style="font-size:12px;color:var(--text-muted)">จาก <input id="trendDateFrom" type="date" class="form-control" value="' + trendDateFrom + '"></label>' +
             '<label style="font-size:12px;color:var(--text-muted)">ถึง <input id="trendDateTo" type="date" class="form-control" value="' + trendDateTo + '"></label>' +
             '<button id="btnPrintTrend" class="btn btn-outline btn-sm">🖨️ พิมพ์</button></div></div>' +
-            '<canvas id="liveTrendChart" height="140"></canvas></div>' +
+            '<canvas id="liveTrendChart" height="220"></canvas></div>' +
           '<div class="card"><div class="card-head"><h3>สินค้าขายดีวันนี้</h3></div><div id="liveTopProducts"><canvas id="liveTopChart" height="100"></canvas></div></div>' +
           '<div class="card"><div class="card-head"><h3>⚠️ แจ้งเตือนสต็อกใกล้หมด/หมด</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintStock">🖨️ พิมพ์</button></div><div id="liveLowStock">' + UI.loading() + '</div></div>' +
           '<div class="card"><div class="card-head"><h3>ออเดอร์ล่าสุด</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintOrders">🖨️ พิมพ์</button></div><div id="liveRecentOrders">' + UI.loading() + '</div></div>' +

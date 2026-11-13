@@ -9,6 +9,9 @@ var Charts = (function () {
   var bgPluginRegistered = false;
   var GRID_COLOR_ = '#eef0f3';
   var PLOT_BG_ = '#fafafb';
+  // กราฟเส้นที่มีจุดเยอะเกินไป (เช่น "รายวัน 30 วันล่าสุด") แปะป้ายตัวเลขไว้ทุกจุดแล้วอ่านไม่ออกเพราะทับกันเอง
+  // เกินจำนวนนี้ไม่แปะป้ายถาวรอีกต่อไป — ดูค่าที่แน่นอนได้จาก tooltip ตอนเอาเมาส์ไปชี้แทน
+  var DENSE_LINE_LIMIT_ = 14;
 
   function fmtVal_(v) {
     if (v === null || v === undefined || v === '') return '';
@@ -31,6 +34,7 @@ var Charts = (function () {
         chart.data.datasets.forEach(function (dataset, di) {
           var meta = chart.getDatasetMeta(di);
           if (meta.hidden) return;
+          if (chart.config.type === 'line' && meta.data.length > DENSE_LINE_LIMIT_) return;
           meta.data.forEach(function (el, i) {
             var raw = dataset.data[i];
             var label = fmtVal_(raw);
@@ -83,11 +87,15 @@ var Charts = (function () {
 
   function destroy(canvasId) { if (instances[canvasId]) { instances[canvasId].destroy(); delete instances[canvasId]; } }
 
-  /** กันปัญหา canvas สูงขึ้นเรื่อยๆ ไม่หยุดตอนสลับแท็บ/resize — ต้องมี wrapper สูงคงที่เสมอเมื่อใช้ maintainAspectRatio:false */
-  function lockHeight_(canvas) {
+  /**
+   * กันปัญหา canvas สูงขึ้นเรื่อยๆ ไม่หยุดตอนสลับแท็บ/resize — ต้องมี wrapper สูงคงที่เสมอเมื่อใช้ maintainAspectRatio:false
+   * explicitHeight (optional): บังคับความสูงเอง แทนค่าจาก attribute "height" ของ canvas — ใช้ตอนกราฟแท่งแนวนอน
+   * ที่จำนวนแท่งไม่คงที่ (เช่น Top 10 สินค้า) ให้ความสูงขยายตามจำนวนแท่งจริง กันแท่ง/ป้ายตัวเลขบีบจนทับกัน
+   */
+  function lockHeight_(canvas, explicitHeight) {
     var parent = canvas.parentElement;
     if (!parent) return;
-    var h = parseInt(canvas.getAttribute('height'), 10) || 260;
+    var h = explicitHeight || parseInt(canvas.getAttribute('height'), 10) || 260;
     if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
     parent.style.height = h + 'px';
     parent.style.width = '100%';
@@ -139,7 +147,9 @@ var Charts = (function () {
     if (!ctx || !window.Chart) return;
     registerDataLabelPlugin_();
     registerBgPlugin_();
-    lockHeight_(ctx);
+    // แนวนอน (เช่น Top 10 สินค้า) ยิ่งมีแท่งเยอะยิ่งต้องการความสูงมากขึ้นตามสัดส่วน — กันป้ายตัวเลข/ชื่อแท่งทับกัน
+    // แนวตั้ง (รายเดือน/รายปี) จำนวนแท่งค่อนข้างคงที่อยู่แล้ว ใช้ความสูงจาก attribute "height" ตามเดิม
+    lockHeight_(ctx, horizontal ? Math.max(160, labels.length * 36 + 40) : null);
     var opts = baseOptions_({
       indexAxis: horizontal ? 'y' : 'x',
       layout: { padding: Object.assign({}, PLOT_PADDING_, horizontal ? { right: 44 } : {}) },
