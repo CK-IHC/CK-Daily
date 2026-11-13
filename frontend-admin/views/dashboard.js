@@ -1,5 +1,5 @@
 /**
- * views/dashboard.js — KPI สรุป + กราฟยอดขาย (สัปดาห์/เดือน/ปี แยก 3 การ์ด) + กราฟรายสินค้า + ยอดขายรายรอบ + ออเดอร์ที่ต้องจัดการ
+ * views/dashboard.js — KPI สรุป + กราฟยอดขาย (ตามรอบการขาย/เดือน/ปี แยก 3 การ์ด) + กราฟรายสินค้า + ยอดขายรายรอบ + ออเดอร์ที่ต้องจัดการ
  * รีเฟรชข้อมูลอัตโนมัติทุก 30 วินาที (ไม่รื้อ DOM ทั้งหน้า กันตัวกรองที่เลือกไว้รีเซ็ต) ให้ความรู้สึกเป็น live dashboard
  */
 var DASHBOARD_REFRESH_MS_ = 30000;
@@ -81,11 +81,11 @@ Views.dashboard = function (container) {
       '<div class="kpi-grid" id="kpiGrid">' + kpiGridHtml_(d) + '</div>' +
       '<h3 style="margin:4px 0 12px">ยอดขายรวม</h3>' +
       '<div class="chart-grid">' +
-        '<div class="card"><div class="card-head"><h3>รายสัปดาห์ (90 วันล่าสุด)</h3>' +
-          '<button class="btn btn-outline btn-sm no-print" id="btnPrintWeekly">🖨️</button></div>' +
+        '<div class="card"><div class="card-head"><h3>ตามรอบการขาย (90 วันล่าสุด)</h3>' +
+          '<button class="btn btn-outline btn-sm no-print" id="btnPrintRoundSales">🖨️</button></div>' +
           // canvas ต้องอยู่ใน wrapper ของตัวเอง แยกจาก .card-head เพราะ Charts.* บังคับความสูงคงที่ที่
           // "parentElement" ของ canvas เสมอ — ถ้า parent คือ .card ทั้งก้อน หัวการ์ดด้านบนจะถูกบีบ/ตัดไปด้วย
-          '<div id="weeklyChartArea"><canvas id="weeklySalesChart"></canvas></div></div>' +
+          '<div id="roundSalesChartArea"><canvas id="roundSalesChart"></canvas></div></div>' +
         '<div class="card"><div class="card-head"><h3>รายเดือน (Jan-Dec)</h3>' +
           '<div class="no-print" style="display:flex;gap:6px;align-items:center">' +
           '<select id="yearSelect" class="form-control" style="width:auto;display:inline-block">' +
@@ -101,7 +101,7 @@ Views.dashboard = function (container) {
       '<div class="card"><h3>ยอดขายแยกรายรอบ</h3><div id="roundSalesArea">' + UI.loading() + '</div></div>' +
       '<div class="card"><div class="card-head"><h3>ออเดอร์ที่ต้องดำเนินการ</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintAction">🖨️ พิมพ์</button></div><div id="actionOrders">' + UI.loading() + '</div></div>';
 
-    document.getElementById('btnPrintWeekly').onclick = function (e) { UI.printWithHeader('ยอดขายรายสัปดาห์', e.currentTarget.closest('.card')); };
+    document.getElementById('btnPrintRoundSales').onclick = function (e) { UI.printWithHeader('ยอดขายตามรอบการขาย', e.currentTarget.closest('.card')); };
     document.getElementById('btnPrintMonthly').onclick = function (e) { UI.printWithHeader('ยอดขายรายเดือน', e.currentTarget.closest('.card')); };
     document.getElementById('btnPrintYearly').onclick = function (e) { UI.printWithHeader('ยอดขายรายปี', e.currentTarget.closest('.card')); };
     document.getElementById('btnPrintAction').onclick = function (e) { UI.printWithHeader('ออเดอร์ที่ต้องดำเนินการ', e.currentTarget.closest('.card')); };
@@ -116,7 +116,7 @@ Views.dashboard = function (container) {
         var grid = document.getElementById('kpiGrid');
         if (grid) grid.innerHTML = kpiGridHtml_(data);
       }).catch(function () {});
-      loadWeeklySalesChart();
+      loadRoundSalesChart();
       loadMonthlySalesChart();
       loadYearlySalesChart();
       loadTopProducts();
@@ -161,16 +161,29 @@ Views.dashboard = function (container) {
     }
   }).catch(function (err) { container.innerHTML = '<div class="empty-state">' + UI.escapeHtml(err.message) + '</div>'; });
 
-  var MONTH_ABBR_ = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  var MONTH_ABBR_ = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   // "ยอดขายรวม" แยกเป็น 3 กราฟแยกการ์ดกัน แสดงพร้อมกันตลอด แทนการ์ดเดียวที่ต้องสลับดูทีละช่วงเวลาแบบเดิม
-  // รายสัปดาห์ = กราฟเส้นดูแนวโน้ม / รายเดือน-รายปี = หมวดหมู่ไม่ต่อเนื่อง เทียบกันชัดเจนกว่าด้วยกราฟแท่ง
-  function loadWeeklySalesChart() {
-    var payload = { group_by: 'week', date_from: new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10) };
-    Api.call('admin.reports.salesByTime', payload).then(function (r) {
-      if (!document.getElementById('weeklySalesChart')) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อน refresh รอบถัดไปจะทำงาน
-      Charts.line('weeklySalesChart', r.series.map(function (s) { return s.period; }), [{ label: 'ยอดขาย', data: r.series.map(function (s) { return s.sales; }) }]);
-    }).catch(function (err) { UI.toast('โหลดกราฟยอดขายรายสัปดาห์ไม่สำเร็จ: ' + err.message, 'error'); });
+  // ตามรอบการขาย/รายเดือน/รายปี = หมวดหมู่ไม่ต่อเนื่อง เทียบกันชัดเจนกว่าด้วยกราฟแท่งทั้งหมด
+  function loadRoundSalesChart() {
+    var payload = { date_from: new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10) };
+    Api.call('admin.reports.salesByRound', payload).then(function (rows) {
+      var area = document.getElementById('roundSalesChartArea');
+      if (!area) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อน refresh รอบถัดไปจะทำงาน
+      if (!rows.length) { area.innerHTML = '<div class="empty-state">ยังไม่มีรอบการขายใน 90 วันล่าสุด</div>'; return; }
+      // เรียงตามเวลาเปิดรอบจริง (backend คืนมาเรียงตามยอดขายมาก-น้อย) แล้วนับ "รอบที่ N" แยกตามเดือนที่เปิดรอบ
+      // เช่น เดือนนี้เปิด 3 รอบ ก็จะได้ป้าย "OCT 2026 / รอบที่ 1, 2, 3" ไล่ตามลำดับเวลาในเดือนนั้น
+      var sorted = rows.slice().sort(function (a, b) { return new Date(a.open_at) - new Date(b.open_at); });
+      var countInMonth = {};
+      var labels = sorted.map(function (r) {
+        var d = new Date(r.open_at);
+        var monthKey = d.getFullYear() + '-' + d.getMonth();
+        var n = (countInMonth[monthKey] = (countInMonth[monthKey] || 0) + 1);
+        return [MONTH_ABBR_[d.getMonth()].toUpperCase() + ' ' + d.getFullYear(), 'รอบที่ ' + n];
+      });
+      if (!document.getElementById('roundSalesChart')) area.innerHTML = '<canvas id="roundSalesChart"></canvas>';
+      Charts.bar('roundSalesChart', labels, [{ label: 'ยอดขาย', data: sorted.map(function (r) { return r.sales; }) }]);
+    }).catch(function (err) { UI.toast('โหลดกราฟยอดขายตามรอบไม่สำเร็จ: ' + err.message, 'error'); });
   }
 
   function loadMonthlySalesChart() {

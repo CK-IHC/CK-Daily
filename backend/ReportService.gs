@@ -227,7 +227,7 @@ function adminReportsSalesByRound(payload, token) {
   var result = rounds.map(function (r) {
     var orders = byRound_[r.round_id] || [];
     return {
-      round_id: r.round_id, round_name: r.round_name, status: r.status,
+      round_id: r.round_id, round_name: r.round_name, status: r.status, open_at: r.open_at,
       orders: orders.length, sales: round2(orders.reduce(function (s, o) { return s + numFrom(o.grand_total); }, 0))
     };
   }).sort(function (a, b) { return b.sales - a.sales; });
