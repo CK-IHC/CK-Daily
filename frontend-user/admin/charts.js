@@ -45,7 +45,12 @@ var Charts = (function () {
               ctx.textBaseline = 'middle';
               ctx.fillText(label, pos.x + 6, pos.y);
             } else {
-              ctx.textAlign = 'center';
+              // จุด/แท่งที่อยู่ใกล้ขอบซ้าย-ขวาของกราฟ (เช่น จุดแรก/จุดสุดท้าย) ป้ายที่ centered ตามปกติจะยื่น
+              // ไปทับแกน Y (ตัวเลขสเกลด้านซ้าย) หรือล้นออกนอกกรอบด้านขวา — ขยับการจัดวางให้ชิดขอบที่ใกล้แทน
+              var edge = 28;
+              if (pos.x - chart.chartArea.left < edge) ctx.textAlign = 'left';
+              else if (chart.chartArea.right - pos.x < edge) ctx.textAlign = 'right';
+              else ctx.textAlign = 'center';
               ctx.textBaseline = 'bottom';
               ctx.fillText(label, pos.x, pos.y - 6);
             }
