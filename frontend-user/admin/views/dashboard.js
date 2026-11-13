@@ -183,8 +183,9 @@ Views.dashboard = function (container) {
       var area = document.getElementById('roundSalesChartArea');
       if (!area) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อน refresh รอบถัดไปจะทำงาน
       if (!rows.length) { area.innerHTML = '<div class="empty-state">ยังไม่มีรอบการขายในปี ' + selectedYear + '</div>'; return; }
-      // เรียงตามเวลาเปิดรอบจริง (backend คืนมาเรียงตามยอดขายมาก-น้อย) แล้วนับ "รอบที่ N" แยกตามเดือนที่เปิดรอบ
-      // เช่น เดือนนี้เปิด 3 รอบ ก็จะได้ป้าย "OCT 2026 / รอบที่ 1, 2, 3" ไล่ตามลำดับเวลาในเดือนนั้น
+      // เรียงตามเวลาเปิดรอบจริง (backend คืนมาเรียงตามยอดขายมาก-น้อย) แล้วจัดกลุ่มเป็นกราฟแท่งแบบ "กลุ่มต่อ
+      // เดือน" — แกน X เป็นเดือน แต่ละเดือนมีแท่งย่อยตาม "รอบที่ N" วางเรียงชิดกัน (เหมือนกราฟเทียบรอบตาม
+      // เดือนทั่วไป) สีของ "รอบที่ N" เดียวกันจะเหมือนกันทุกเดือน ให้เทียบรอบเดียวกันข้ามเดือนได้ง่ายด้วยสี
       // กรองแถวที่ไม่มี open_at (หรือ parse เป็นวันที่ไม่ได้) ทิ้งก่อน — เกิดได้ถ้า backend ที่ deploy อยู่
       // ยังเป็นเวอร์ชันเก่าก่อนเพิ่มฟิลด์นี้ กันหน้าแอดมินพังทั้งกราฟเพราะข้อมูลแค่บางแถวไม่ครบ
       var sorted = rows.slice()
@@ -194,17 +195,27 @@ Views.dashboard = function (container) {
         area.innerHTML = '<div class="empty-state">ไม่มีข้อมูลวันที่เปิดรอบ — ตรวจสอบว่าอัปโหลด backend/ReportService.gs เวอร์ชันล่าสุดและ Deploy ใหม่แล้วหรือยัง</div>';
         return;
       }
-      var countInMonth = {};
-      var labels = sorted.map(function (r) {
+      var monthOrder = [], byMonth = {}, maxRoundsInMonth = 0;
+      sorted.forEach(function (r) {
         var d = new Date(r.open_at);
         var monthKey = d.getFullYear() + '-' + d.getMonth();
-        var n = (countInMonth[monthKey] = (countInMonth[monthKey] || 0) + 1);
-        return [MONTH_ABBR_[d.getMonth()].toUpperCase() + ' ' + d.getFullYear(), 'รอบที่ ' + n];
+        if (!byMonth[monthKey]) { byMonth[monthKey] = { label: MONTH_ABBR_[d.getMonth()], sales: [] }; monthOrder.push(monthKey); }
+        byMonth[monthKey].sales.push(r.sales);
+        maxRoundsInMonth = Math.max(maxRoundsInMonth, byMonth[monthKey].sales.length);
       });
-      // สีไล่ต่างกันทุกแท่ง (ต่อรอบ) แทนสีเดียวทั้งกราฟ — ช่วยแยกแต่ละรอบออกจากกันด้วยตาได้ง่ายขึ้น
-      var colors = sorted.map(function (r, i) { return Charts.palette[i % Charts.palette.length]; });
+      var labels = monthOrder.map(function (k) { return byMonth[k].label; });
+      var datasets = [];
+      for (var i = 0; i < maxRoundsInMonth; i++) {
+        (function (roundIdx) {
+          datasets.push({
+            label: 'รอบที่ ' + (roundIdx + 1),
+            // null (ไม่ใช่ 0) สำหรับเดือนที่ไม่มีรอบนี้ — กันไม่ให้วาดแท่งสูง 0 โผล่มาเกะกะ ข้ามไปเฉยๆ
+            data: monthOrder.map(function (k) { return byMonth[k].sales[roundIdx] !== undefined ? byMonth[k].sales[roundIdx] : null; })
+          });
+        })(i);
+      }
       if (!document.getElementById('roundSalesChart')) area.innerHTML = '<canvas id="roundSalesChart"></canvas>';
-      Charts.bar('roundSalesChart', labels, [{ label: 'ยอดขาย', data: sorted.map(function (r) { return r.sales; }), backgroundColor: colors }]);
+      Charts.bar('roundSalesChart', labels, datasets);
     }).catch(function (err) { UI.toast('โหลดกราฟยอดขายตามรอบไม่สำเร็จ: ' + err.message, 'error'); });
   }
 
