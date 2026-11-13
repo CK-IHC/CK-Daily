@@ -81,22 +81,24 @@ Views.dashboard = function (container) {
       '<div class="kpi-grid" id="kpiGrid">' + kpiGridHtml_(d) + '</div>' +
       '<h3 style="margin:4px 0 12px">ยอดขายรวม</h3>' +
       '<div class="chart-grid">' +
-        '<div class="card"><div class="card-head"><h3>ตามรอบการขาย (90 วันล่าสุด)</h3>' +
-          '<button class="btn btn-outline btn-sm no-print" id="btnPrintRoundSales">🖨️</button></div>' +
-          // canvas ต้องอยู่ใน wrapper ของตัวเอง แยกจาก .card-head เพราะ Charts.* บังคับความสูงคงที่ที่
-          // "parentElement" ของ canvas เสมอ — ถ้า parent คือ .card ทั้งก้อน หัวการ์ดด้านบนจะถูกบีบ/ตัดไปด้วย
-          '<div id="roundSalesChartArea"><canvas id="roundSalesChart"></canvas></div></div>' +
         '<div class="card"><div class="card-head"><h3>รายเดือน (Jan-Dec)</h3>' +
           '<div class="no-print" style="display:flex;gap:6px;align-items:center">' +
           '<select id="yearSelect" class="form-control" style="width:auto;display:inline-block">' +
             YEAR_OPTIONS_.map(function (y) { return '<option value="' + y + '"' + (y === selectedYear ? ' selected' : '') + '>ปี ' + y + '</option>'; }).join('') +
           '</select>' +
           '<button class="btn btn-outline btn-sm" id="btnPrintMonthly">🖨️</button></div></div>' +
+          // canvas ต้องอยู่ใน wrapper ของตัวเอง แยกจาก .card-head เพราะ Charts.* บังคับความสูงคงที่ที่
+          // "parentElement" ของ canvas เสมอ — ถ้า parent คือ .card ทั้งก้อน หัวการ์ดด้านบนจะถูกบีบ/ตัดไปด้วย
           '<div id="monthlyChartArea"><canvas id="monthlySalesChart"></canvas></div></div>' +
         '<div class="card"><div class="card-head"><h3>รายปี (5 ปีล่าสุด)</h3>' +
           '<button class="btn btn-outline btn-sm no-print" id="btnPrintYearly">🖨️</button></div>' +
           '<div id="yearlyChartArea"><canvas id="yearlySalesChart"></canvas></div></div>' +
       '</div>' +
+      // "ตามรอบการขาย" ย้ายมาอยู่แถวเต็มความกว้างของตัวเอง (แทนที่จะเบียดอยู่ในคอลัมน์แคบๆ ร่วมกับรายเดือน/
+      // รายปี) เพราะแสดงทุกรอบของทั้งปี มีแท่งเยอะกว่าชัดเจน ต้องการพื้นที่กว้างกว่าคอลัมน์ละ 1 ใน 3
+      '<div class="card"><div class="card-head"><h3 id="roundChartTitle">ตามรอบการขาย — ปี ' + selectedYear + '</h3>' +
+        '<button class="btn btn-outline btn-sm no-print" id="btnPrintRoundSales">🖨️</button></div>' +
+        '<div id="roundSalesChartArea"><canvas id="roundSalesChart"></canvas></div></div>' +
       '<div class="card"><h3 id="itemChartTitle">ยอดขายแยกรายสินค้า (Top 10) — ปี ' + selectedYear + '</h3><div id="itemChartArea"><canvas id="itemChart"></canvas></div></div>' +
       '<div class="card"><h3>ยอดขายแยกรายรอบ</h3><div id="roundSalesArea">' + UI.loading() + '</div></div>' +
       '<div class="card"><div class="card-head"><h3>ออเดอร์ที่ต้องดำเนินการ</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintAction">🖨️ พิมพ์</button></div><div id="actionOrders">' + UI.loading() + '</div></div>';
@@ -105,7 +107,7 @@ Views.dashboard = function (container) {
     document.getElementById('btnPrintMonthly').onclick = function (e) { UI.printWithHeader('ยอดขายรายเดือน', e.currentTarget.closest('.card')); };
     document.getElementById('btnPrintYearly').onclick = function (e) { UI.printWithHeader('ยอดขายรายปี', e.currentTarget.closest('.card')); };
     document.getElementById('btnPrintAction').onclick = function (e) { UI.printWithHeader('ออเดอร์ที่ต้องดำเนินการ', e.currentTarget.closest('.card')); };
-    document.getElementById('yearSelect').onchange = function (e) { selectedYear = Number(e.target.value); loadMonthlySalesChart(); loadTopProducts(); };
+    document.getElementById('yearSelect').onchange = function (e) { selectedYear = Number(e.target.value); loadMonthlySalesChart(); loadRoundSalesChart(); loadTopProducts(); };
 
     loadAll_();
     touchLiveDot_();
@@ -166,11 +168,15 @@ Views.dashboard = function (container) {
   // "ยอดขายรวม" แยกเป็น 3 กราฟแยกการ์ดกัน แสดงพร้อมกันตลอด แทนการ์ดเดียวที่ต้องสลับดูทีละช่วงเวลาแบบเดิม
   // ตามรอบการขาย/รายเดือน/รายปี = หมวดหมู่ไม่ต่อเนื่อง เทียบกันชัดเจนกว่าด้วยกราฟแท่งทั้งหมด
   function loadRoundSalesChart() {
-    var payload = { date_from: new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10) };
+    var titleEl = document.getElementById('roundChartTitle');
+    if (titleEl) titleEl.textContent = 'ตามรอบการขาย — ปี ' + selectedYear;
+    // ทั้งปีที่เลือก (ตัวเลือกปีเดียวกับการ์ด "รายเดือน") ไม่ใช่แค่ 90 วันล่าสุดแบบเดิม — ให้เห็นทุกเดือน/
+    // ทุกรอบที่มีการขายตลอดปีนั้นในกราฟเดียว
+    var payload = { date_from: selectedYear + '-01-01', date_to: selectedYear + '-12-31' };
     Api.call('admin.reports.salesByRound', payload).then(function (rows) {
       var area = document.getElementById('roundSalesChartArea');
       if (!area) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อน refresh รอบถัดไปจะทำงาน
-      if (!rows.length) { area.innerHTML = '<div class="empty-state">ยังไม่มีรอบการขายใน 90 วันล่าสุด</div>'; return; }
+      if (!rows.length) { area.innerHTML = '<div class="empty-state">ยังไม่มีรอบการขายในปี ' + selectedYear + '</div>'; return; }
       // เรียงตามเวลาเปิดรอบจริง (backend คืนมาเรียงตามยอดขายมาก-น้อย) แล้วนับ "รอบที่ N" แยกตามเดือนที่เปิดรอบ
       // เช่น เดือนนี้เปิด 3 รอบ ก็จะได้ป้าย "OCT 2026 / รอบที่ 1, 2, 3" ไล่ตามลำดับเวลาในเดือนนั้น
       // กรองแถวที่ไม่มี open_at (หรือ parse เป็นวันที่ไม่ได้) ทิ้งก่อน — เกิดได้ถ้า backend ที่ deploy อยู่
@@ -189,8 +195,10 @@ Views.dashboard = function (container) {
         var n = (countInMonth[monthKey] = (countInMonth[monthKey] || 0) + 1);
         return [MONTH_ABBR_[d.getMonth()].toUpperCase() + ' ' + d.getFullYear(), 'รอบที่ ' + n];
       });
+      // สีไล่ต่างกันทุกแท่ง (ต่อรอบ) แทนสีเดียวทั้งกราฟ — ช่วยแยกแต่ละรอบออกจากกันด้วยตาได้ง่ายขึ้น
+      var colors = sorted.map(function (r, i) { return Charts.palette[i % Charts.palette.length]; });
       if (!document.getElementById('roundSalesChart')) area.innerHTML = '<canvas id="roundSalesChart"></canvas>';
-      Charts.bar('roundSalesChart', labels, [{ label: 'ยอดขาย', data: sorted.map(function (r) { return r.sales; }) }]);
+      Charts.bar('roundSalesChart', labels, [{ label: 'ยอดขาย', data: sorted.map(function (r) { return r.sales; }), backgroundColor: colors }]);
     }).catch(function (err) { UI.toast('โหลดกราฟยอดขายตามรอบไม่สำเร็จ: ' + err.message, 'error'); });
   }
 

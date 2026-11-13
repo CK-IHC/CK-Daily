@@ -226,5 +226,7 @@ var Charts = (function () {
     });
   }
 
-  return { line: line, bar: bar, doughnut: doughnut, destroy: destroy };
+  // เปิดให้หน้าที่เรียกใช้ดึงชุดสีมาตรฐานไปใช้เองได้ (เช่น ไล่สีแยกทีละแท่งในกราฟเดียว) ใช้ชุดเดียวกับที่
+  // กราฟหลาย dataset ในไฟล์นี้ใช้อยู่แล้ว สีจะได้สอดคล้องกันทั้งระบบ ไม่ต้องกำหนดชุดสีซ้ำแยกแต่ละหน้า
+  return { line: line, bar: bar, doughnut: doughnut, destroy: destroy, palette: PALETTE };
 })();
