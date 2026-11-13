@@ -78,8 +78,8 @@ Views.liveDashboard = function (container) {
             '<button id="btnPrintTrend" class="btn btn-outline btn-sm">🖨️ พิมพ์</button></div></div>' +
             // canvas ต้องอยู่ใน wrapper ของตัวเอง แยกจาก .card-head — ไม่งั้น Charts.line บังคับความสูงคงที่
             // ทับ .card ทั้งก้อน แถบวันที่ "จาก-ถึง" ด้านบนจะถูกบีบ/ตัดไปด้วย (กราฟกับกรอบการ์ดเลยทับกัน)
-            '<div id="liveTrendChartArea"><canvas id="liveTrendChart" height="220"></canvas></div></div>' +
-          '<div class="card"><div class="card-head"><h3>สินค้าขายดีวันนี้</h3></div><div id="liveTopProducts"><canvas id="liveTopChart" height="100"></canvas></div></div>' +
+            '<div id="liveTrendChartArea"><canvas id="liveTrendChart"></canvas></div></div>' +
+          '<div class="card"><div class="card-head"><h3>สินค้าขายดีวันนี้</h3></div><div id="liveTopProducts"><canvas id="liveTopChart"></canvas></div></div>' +
           '<div class="card"><div class="card-head"><h3>⚠️ แจ้งเตือนสต็อกใกล้หมด/หมด</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintStock">🖨️ พิมพ์</button></div><div id="liveLowStock">' + UI.loading() + '</div></div>' +
           '<div class="card"><div class="card-head"><h3>ออเดอร์ล่าสุด</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintOrders">🖨️ พิมพ์</button></div><div id="liveRecentOrders">' + UI.loading() + '</div></div>' +
           '<div class="card"><div class="card-head"><h3>การเคลื่อนไหวสต็อกล่าสุด</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintMovements">🖨️ พิมพ์</button></div><div id="liveRecentMovements">' + UI.loading() + '</div></div>';
@@ -99,7 +99,7 @@ Views.liveDashboard = function (container) {
       if (topArea) {
         if (!d.top_products_today.length) { topArea.innerHTML = '<div class="empty-state">ยังไม่มียอดขายวันนี้</div>'; }
         else {
-          if (!document.getElementById('liveTopChart')) topArea.innerHTML = '<canvas id="liveTopChart" height="100"></canvas>';
+          if (!document.getElementById('liveTopChart')) topArea.innerHTML = '<canvas id="liveTopChart"></canvas>';
           Charts.bar('liveTopChart', d.top_products_today.map(function (p) { return p.product_name; }), [{ label: 'ยอดขาย (บาท)', data: d.top_products_today.map(function (p) { return p.revenue; }) }], true);
         }
       }

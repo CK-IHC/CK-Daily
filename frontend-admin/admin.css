@@ -46,6 +46,13 @@ button, input, select, textarea { font-family: inherit; }
 
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 24px; }
 .card canvas { display: block; margin: 0 auto; }
+/**
+ * ความสูงมาตรฐานของกรอบกราฟ (เส้น/แท่งแนวตั้ง) — ปรับตามความกว้างจอด้วย clamp() แทนตัวเลข px ตายตัว
+ * ที่ต้องเดาแยกทีละกราฟ (สาเหตุเดิมที่ขนาดกราฟกับกรอบการ์ดไม่สัมพันธ์กัน) — charts.js เป็นคนเติม class
+ * นี้ให้อัตโนมัติทุกครั้งที่วาดกราฟ ไม่ต้องกำหนด height ในไฟล์หน้าแต่ละหน้าเองอีกต่อไป
+ * กราฟแท่งแนวนอน (เช่น Top 10 สินค้า) ไม่ใช้กฎนี้ — ความสูงคำนวณจากจำนวนแท่งจริงใน charts.js แทน
+ */
+.chart-wrap { height: clamp(200px, 34vw, 260px); }
 .card h3 { margin: 0 0 14px; font-size: 15px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
 

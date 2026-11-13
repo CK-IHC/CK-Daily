@@ -98,8 +98,8 @@ Views.dashboard = function (container) {
         // canvas ต้องอยู่ใน wrapper ของตัวเอง แยกจาก .card-head (ตัวกรองด้านบน) เพราะ Charts.* บังคับความสูง
         // คงที่ที่ "parentElement" ของ canvas เสมอ — ถ้า parent คือ .card ทั้งก้อน แถบตัวกรองด้านบนจะถูกบีบ/ตัด
         // ไปด้วย (เป็นสาเหตุที่กราฟกับกรอบการ์ดทับกัน)
-        '<div id="salesChartArea"><canvas id="salesChart" height="220"></canvas></div></div>' +
-      '<div class="card"><h3 id="itemChartTitle">ยอดขายแยกรายสินค้า (Top 10) — ปี ' + selectedYear + '</h3><div id="itemChartArea"><canvas id="itemChart" height="100"></canvas></div></div>' +
+        '<div id="salesChartArea"><canvas id="salesChart"></canvas></div></div>' +
+      '<div class="card"><h3 id="itemChartTitle">ยอดขายแยกรายสินค้า (Top 10) — ปี ' + selectedYear + '</h3><div id="itemChartArea"><canvas id="itemChart"></canvas></div></div>' +
       '<div class="card"><h3>ยอดขายแยกรายรอบ</h3><div id="roundSalesArea">' + UI.loading() + '</div></div>' +
       '<div class="card"><div class="card-head"><h3>ออเดอร์ที่ต้องดำเนินการ</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintAction">🖨️ พิมพ์</button></div><div id="actionOrders">' + UI.loading() + '</div></div>';
 
@@ -139,7 +139,7 @@ Views.dashboard = function (container) {
         var itemArea = document.getElementById('itemChartArea');
         if (!itemArea) return;
         if (!r.by_qty.length) { itemArea.innerHTML = '<div class="empty-state">ยังไม่มียอดขายในปี ' + selectedYear + '</div>'; return; }
-        if (!document.getElementById('itemChart')) itemArea.innerHTML = '<canvas id="itemChart" height="100"></canvas>';
+        if (!document.getElementById('itemChart')) itemArea.innerHTML = '<canvas id="itemChart"></canvas>';
         Charts.bar('itemChart', r.by_qty.map(function (p) { return p.product_name; }), [{ label: 'จำนวนที่ขาย', data: r.by_qty.map(function (p) { return p.qty; }) }], true);
       }).catch(function (err) {
         var itemArea = document.getElementById('itemChartArea');

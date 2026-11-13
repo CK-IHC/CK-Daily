@@ -94,17 +94,21 @@ var Charts = (function () {
 
   /**
    * กันปัญหา canvas สูงขึ้นเรื่อยๆ ไม่หยุดตอนสลับแท็บ/resize — ต้องมี wrapper สูงคงที่เสมอเมื่อใช้ maintainAspectRatio:false
-   * explicitHeight (optional): บังคับความสูงเอง แทนค่าจาก attribute "height" ของ canvas — ใช้ตอนกราฟแท่งแนวนอน
-   * ที่จำนวนแท่งไม่คงที่ (เช่น Top 10 สินค้า) ให้ความสูงขยายตามจำนวนแท่งจริง กันแท่ง/ป้ายตัวเลขบีบจนทับกัน
+   * ไม่ต้องกำหนด height เป็นตัวเลข px ในไฟล์หน้าแต่ละหน้าอีกต่อไป (เดิมเป็นสาเหตุที่ขนาดกราฟกับกรอบการ์ด
+   * ไม่สัมพันธ์กัน เพราะแต่ละหน้าเดาเลขคนละค่า) — เติม class "chart-wrap" ให้ wrapper อัตโนมัติเสมอ แล้วปล่อยให้
+   * admin.css (clamp ตามความกว้างจอ) เป็นคนคุมความสูงแทนเป็นค่ามาตรฐานเดียวกันทั้งระบบ
+   * explicitHeight (optional): บังคับความสูงเองแทน class ด้านบน — ใช้เฉพาะกราฟแท่งแนวนอนที่จำนวนแท่งไม่คงที่
+   * (เช่น Top 10 สินค้า) ต้องขยายความสูงตามจำนวนแท่งจริง กันแท่ง/ป้ายตัวเลขบีบจนทับกัน
    */
   function lockHeight_(canvas, explicitHeight) {
     var parent = canvas.parentElement;
     if (!parent) return;
-    var h = explicitHeight || parseInt(canvas.getAttribute('height'), 10) || 260;
+    parent.classList.add('chart-wrap');
     if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
-    parent.style.height = h + 'px';
     parent.style.width = '100%';
     parent.style.overflow = 'hidden'; // กันกราฟ (หรือ label ของกราฟ) ล้นออกนอกกรอบการ์ดในทุกกรณี
+    if (explicitHeight) parent.style.height = explicitHeight + 'px';
+    else parent.style.removeProperty('height'); // ปล่อยให้ .chart-wrap (CSS) คุมความสูงแทน
   }
 
   // ระยะขอบรอบโซนกราฟเท่ากันทั้ง 4 ด้าน ให้พื้นหลัง/แกนดูสมมาตร ไม่เอียงไปด้านใดด้านหนึ่ง
@@ -153,7 +157,7 @@ var Charts = (function () {
     registerDataLabelPlugin_();
     registerBgPlugin_();
     // แนวนอน (เช่น Top 10 สินค้า) ยิ่งมีแท่งเยอะยิ่งต้องการความสูงมากขึ้นตามสัดส่วน — กันป้ายตัวเลข/ชื่อแท่งทับกัน
-    // แนวตั้ง (รายเดือน/รายปี) จำนวนแท่งค่อนข้างคงที่อยู่แล้ว ใช้ความสูงจาก attribute "height" ตามเดิม
+    // แนวตั้ง (รายเดือน/รายปี) จำนวนแท่งค่อนข้างคงที่อยู่แล้ว ใช้ความสูงมาตรฐานจาก .chart-wrap (CSS) แทน
     lockHeight_(ctx, horizontal ? Math.max(160, labels.length * 36 + 40) : null);
     var opts = baseOptions_({
       indexAxis: horizontal ? 'y' : 'x',

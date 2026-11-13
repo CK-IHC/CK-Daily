@@ -69,7 +69,9 @@ Views.reports = function (container) {
         '<div class="kpi-grid"><div class="kpi-card"><div class="label">ยอดขายรวม</div><div class="value">' + UI.money(d.total_sales) + '</div></div>' +
         '<div class="kpi-card"><div class="label">จำนวนออเดอร์</div><div class="value">' + d.total_orders + '</div></div>' +
         '<div class="kpi-card"><div class="label">เทียบช่วงก่อนหน้า</div><div class="value">' + (d.change_pct === null ? '-' : (d.change_pct > 0 ? '+' : '') + d.change_pct + '%') + '</div></div></div>' +
-        '<canvas id="salesLineChart" height="90"></canvas></div>';
+        // canvas ต้องอยู่ใน wrapper ของตัวเอง แยกจาก card-head/kpi-grid ด้านบน — ไม่งั้น Charts.line บังคับ
+        // ความสูงคงที่ทับ .card ทั้งก้อน เนื้อหาอื่นในการ์ดเดียวกันจะถูกบีบ/ตัดไปด้วย
+        '<div id="salesLineChartArea"><canvas id="salesLineChart"></canvas></div></div>';
       Charts.line('salesLineChart', d.series.map(function (s) { return s.period; }), [{ label: 'ยอดขาย', data: d.series.map(function (s) { return s.sales; }) }]);
       document.getElementById('exp').onclick = function () { UI.exportCsv('sales-by-time.csv', d.series); };
     });
@@ -91,9 +93,9 @@ Views.reports = function (container) {
       var top = res[0], bottom = res[1];
       area.innerHTML =
         '<div class="card"><div class="card-head"><h3>🏆 จัดอันดับสินค้าขายดี (ตามจำนวนที่ขาย)</h3><button class="btn btn-sm btn-outline no-print" id="expTopQty">Export CSV</button></div>' +
-          '<canvas id="topQtyChart" height="100"></canvas>' + rankTable_(top.by_qty, 'qty', 'จำนวนที่ขาย') + '</div>' +
+          '<div id="topQtyChartArea"><canvas id="topQtyChart"></canvas></div>' + rankTable_(top.by_qty, 'qty', 'จำนวนที่ขาย') + '</div>' +
         '<div class="card"><div class="card-head"><h3>🏆 จัดอันดับสินค้าขายดี (ตามรายได้)</h3><button class="btn btn-sm btn-outline no-print" id="expTopRev">Export CSV</button></div>' +
-          '<canvas id="topRevChart" height="100"></canvas>' + rankTable_(top.by_revenue, 'revenue', 'รายได้') + '</div>' +
+          '<div id="topRevChartArea"><canvas id="topRevChart"></canvas></div>' + rankTable_(top.by_revenue, 'revenue', 'รายได้') + '</div>' +
         '<div class="card"><h3>สินค้าขายไม่ออก (ต่ำสุดในช่วงที่เลือก)</h3>' + table(bottom.bottom_selling, ['product_name', 'qty', 'revenue']) + '</div>' +
         '<div class="card"><h3>ไม่มียอดขายเลยในช่วงที่เลือก</h3>' + table(bottom.no_sales_in_range, ['product_name']) + '</div>';
       Charts.bar('topQtyChart', top.by_qty.map(function (p) { return p.product_name; }), [{ label: 'จำนวน', data: top.by_qty.map(function (p) { return p.qty; }) }], true);
@@ -107,7 +109,7 @@ Views.reports = function (container) {
   function loadRounds(r, area) {
     Api.call('admin.reports.salesByRound', r).then(function (rows) {
       area.innerHTML = '<div class="card"><div class="card-head"><h3>ยอดขายตามรอบ</h3><button class="btn btn-sm btn-outline no-print" id="exp">Export CSV</button></div>' +
-        '<canvas id="roundChart" height="90"></canvas>' + table(rows, ['round_name', 'status', 'orders', 'sales']) + '</div>';
+        '<div id="roundChartArea"><canvas id="roundChart"></canvas></div>' + table(rows, ['round_name', 'status', 'orders', 'sales']) + '</div>';
       Charts.bar('roundChart', rows.map(function (x) { return x.round_name; }), [{ label: 'ยอดขาย', data: rows.map(function (x) { return x.sales; }) }]);
       document.getElementById('exp').onclick = function () { UI.exportCsv('sales-by-round.csv', rows); };
       area.querySelectorAll('table').forEach(UI.makeTableSortable);
@@ -150,7 +152,7 @@ Views.reports = function (container) {
 
   function loadPayments(r, area) {
     Api.call('admin.reports.payments', r).then(function (d) {
-      area.innerHTML = '<div class="card"><h3>รายงานการชำระเงิน</h3><canvas id="payChart" height="90"></canvas>' +
+      area.innerHTML = '<div class="card"><h3>รายงานการชำระเงิน</h3><div id="payChartArea"><canvas id="payChart"></canvas></div>' +
         table(d.by_method, ['method', 'count', 'total']) +
         '<div class="kpi-grid" style="margin-top:14px"><div class="kpi-card"><div class="label">สลิปรอตรวจสอบ</div><div class="value">' + d.pending_slips_count + '</div><div class="sub">' + UI.money(d.pending_slips_amount) + '</div></div>' +
         '<div class="kpi-card"><div class="label">ยอดค้างชำระ</div><div class="value">' + UI.money(d.unpaid_amount) + '</div></div></div></div>';
