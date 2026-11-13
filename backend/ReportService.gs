@@ -21,12 +21,15 @@ function ordersInRange_(from, to, onlyCompleted, roundId) {
   });
 }
 
-function cogsForOrder_(orderId, productCostMap) {
-  var items = findAll('OrderItems', function (i) { return i.order_id === orderId; });
-  return items.reduce(function (sum, i) {
-    var cost = productCostMap[i.product_id] || 0;
-    return sum + cost * numFrom(i.qty);
-  }, 0);
+/** รวมต้นทุนขาย (COGS) ของหลายออเดอร์พร้อมกัน คืน map order_id -> cogs — อ่าน OrderItems ครั้งเดียว
+ * (เดิมเรียกทีละออเดอร์ อ่านชีต OrderItems ทั้งชีตซ้ำทุกออเดอร์ ช้ามากเมื่อมีออเดอร์ที่ต้องคำนวณหลายใบ) */
+function cogsByOrderMap_(orderIds, productCostMap) {
+  var idSet = {}; orderIds.forEach(function (id) { idSet[id] = true; });
+  var map = {};
+  findAll('OrderItems', function (i) { return idSet[i.order_id]; }).forEach(function (i) {
+    map[i.order_id] = (map[i.order_id] || 0) + (productCostMap[i.product_id] || 0) * numFrom(i.qty);
+  });
+  return map;
 }
 
 function buildProductCostMap_() {
@@ -38,31 +41,35 @@ function buildProductCostMap_() {
 /** ===================== admin.dashboard ===================== */
 function adminDashboard(payload, token) {
   requireRole(token, ['manager', 'admin']);
+  // อ่าน Orders ทั้งชีตครั้งเดียว แล้วกรอง/จัดกลุ่มในหน่วยความจำทั้งหมด — เดิมกราฟ 30 วันด้านล่างเรียก
+  // ordersInRange_ (อ่านทั้งชีตใหม่ทุกครั้งเพราะ Orders ไม่ได้ cache) ซ้ำ 30 รอบในฟังก์ชันเดียว
+  var allOrders = findAll('Orders', null);
   var todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   var todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
-  var todayOrders = ordersInRange_(todayStart, todayEnd, false);
+  var todayOrders = allOrders.filter(function (o) { var d = toDate(o.placed_at); return d && d >= todayStart && d <= todayEnd; });
   var todayCompleted = todayOrders.filter(function (o) { return o.status === 'completed'; });
   var salesToday = round2(todayCompleted.reduce(function (s, o) { return s + numFrom(o.grand_total); }, 0));
   var orderCountToday = todayOrders.filter(function (o) { return o.status !== 'cancelled'; }).length;
   var aov = orderCountToday > 0 ? round2(salesToday / Math.max(1, todayCompleted.length)) : 0;
 
   var costMap = buildProductCostMap_();
-  var cogsToday = todayCompleted.reduce(function (s, o) { return s + cogsForOrder_(o.order_id, costMap); }, 0);
+  var cogsByOrder = cogsByOrderMap_(todayCompleted.map(function (o) { return o.order_id; }), costMap);
+  var cogsToday = todayCompleted.reduce(function (s, o) { return s + (cogsByOrder[o.order_id] || 0); }, 0);
   var grossProfitToday = round2(salesToday - cogsToday);
 
   var usersCreatedToday = countRows('Users', function (u) {
     var d = toDate(u.created_at); return d && d >= todayStart && d <= todayEnd;
   });
 
-  var actionNeeded = findAll('Orders', function (o) { return ['pending', 'in_progress'].indexOf(o.status) > -1; }).length;
-  var pendingSlips = findAll('Orders', function (o) { return o.payment_status === 'pending_verify'; }).length;
+  var actionNeeded = allOrders.filter(function (o) { return ['pending', 'in_progress'].indexOf(o.status) > -1; }).length;
+  var pendingSlips = allOrders.filter(function (o) { return o.payment_status === 'pending_verify'; }).length;
 
   var chart = [];
   for (var i = 29; i >= 0; i--) {
     var day = addDays(new Date(), -i);
     var from = new Date(day); from.setHours(0, 0, 0, 0);
     var to = new Date(day); to.setHours(23, 59, 59, 999);
-    var completed = ordersInRange_(from, to, true);
+    var completed = allOrders.filter(function (o) { var d = toDate(o.placed_at); return o.status === 'completed' && d && d >= from && d <= to; });
     chart.push({
       date: Utilities.formatDate(day, TIMEZONE, 'yyyy-MM-dd'),
       sales: round2(completed.reduce(function (s, o) { return s + numFrom(o.grand_total); }, 0)),
@@ -88,11 +95,18 @@ function adminLiveDashboard(payload, token) {
   requireRole(token, ['manager', 'admin']);
   var todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   var todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
-  var todayOrders = ordersInRange_(todayStart, todayEnd, false).filter(function (o) { return o.status !== 'cancelled'; });
+  // อ่าน Orders ทั้งชีตครั้งเดียว ใช้ทั้งยอดวันนี้/ออเดอร์ล่าสุด/สลิปรอตรวจ/ยอดค้างชำระ — เดิมแต่ละก้อนเรียก
+  // findAll('Orders', ...) แยกกัน (อ่านทั้งชีตใหม่ทุกครั้งเพราะไม่ได้ cache) รวมแล้วอ่านซ้ำหลายรอบในฟังก์ชัน
+  // เดียวที่หน้าเว็บเรียกทุก 30 วินาทีด้วย ยิ่งต้องรีบตัดรอบที่ไม่จำเป็นออก
+  var allOrders = findAll('Orders', null);
+  var todayOrders = allOrders.filter(function (o) {
+    var d = toDate(o.placed_at); return d && d >= todayStart && d <= todayEnd && o.status !== 'cancelled';
+  });
   var todayCompleted = todayOrders.filter(function (o) { return o.status === 'completed'; });
   var salesToday = round2(todayOrders.reduce(function (s, o) { return s + numFrom(o.grand_total); }, 0));
   var costMap = buildProductCostMap_();
-  var cogsToday = todayOrders.reduce(function (s, o) { return s + cogsForOrder_(o.order_id, costMap); }, 0);
+  var cogsByOrder = cogsByOrderMap_(todayOrders.map(function (o) { return o.order_id; }), costMap);
+  var cogsToday = todayOrders.reduce(function (s, o) { return s + (cogsByOrder[o.order_id] || 0); }, 0);
 
   var todayAgg = productSalesAgg_({ from: todayStart, to: todayEnd });
   var topToday = Object.keys(todayAgg).map(function (k) { todayAgg[k].revenue = round2(todayAgg[k].revenue); return todayAgg[k]; })
@@ -102,13 +116,13 @@ function adminLiveDashboard(payload, token) {
     .map(function (p) { return { product_id: p.product_id, sku: p.sku, name: p.name, stock_qty: numFrom(p.stock_qty), reorder_point: numFrom(p.reorder_point) }; })
     .sort(function (a, b) { return a.stock_qty - b.stock_qty; }).slice(0, 10);
 
-  var recentOrders = findAll('Orders', null).sort(function (a, b) { return toDate(b.placed_at) - toDate(a.placed_at); }).slice(0, 15)
+  var recentOrders = allOrders.slice().sort(function (a, b) { return toDate(b.placed_at) - toDate(a.placed_at); }).slice(0, 15)
     .map(function (o) {
       return { order_id: o.order_id, order_no: o.order_no, customer_name: o.customer_name, grand_total: numFrom(o.grand_total), status: normalizeOrderStatus_(o.status), payment_status: o.payment_status, placed_at: o.placed_at };
     });
 
-  var pendingSlips = findAll('Orders', function (o) { return o.payment_status === 'pending_verify'; });
-  var unpaidOrders = findAll('Orders', function (o) { return o.payment_status === 'unpaid' && o.status !== 'cancelled'; });
+  var pendingSlips = allOrders.filter(function (o) { return o.payment_status === 'pending_verify'; });
+  var unpaidOrders = allOrders.filter(function (o) { return o.payment_status === 'unpaid' && o.status !== 'cancelled'; });
 
   var recentMovements = findAll('StockMovements', null, true).sort(function (a, b) { return toDate(b.created_at) - toDate(a.created_at); }).slice(0, 10)
     .map(function (m) { return { sku: m.sku, product_id: m.product_id, type: m.type, qty_change: numFrom(m.qty_change), reason: m.reason, created_at: m.created_at }; });
@@ -205,8 +219,13 @@ function adminReportsSalesByRound(payload, token) {
   requireRole(token, ['manager', 'admin']);
   var range = dateRangeFromPayload_(payload);
   var rounds = findAll('Rounds', function (r) { return toDate(r.open_at) >= range.from && toDate(r.open_at) <= range.to; });
+  // อ่าน Orders ครั้งเดียวแล้วจัดกลุ่มตามรอบในหน่วยความจำ แทนอ่านทั้งชีตซ้ำทุกรอบที่มีอยู่
+  var byRound_ = {};
+  findAll('Orders', function (o) { return o.status !== 'cancelled'; }).forEach(function (o) {
+    (byRound_[o.round_id] = byRound_[o.round_id] || []).push(o);
+  });
   var result = rounds.map(function (r) {
-    var orders = findAll('Orders', function (o) { return o.round_id === r.round_id && o.status !== 'cancelled'; });
+    var orders = byRound_[r.round_id] || [];
     return {
       round_id: r.round_id, round_name: r.round_name, status: r.status,
       orders: orders.length, sales: round2(orders.reduce(function (s, o) { return s + numFrom(o.grand_total); }, 0))
@@ -246,6 +265,18 @@ function adminReportsProfitLoss(payload, token) {
 function adminReportsStock(payload, token) {
   requireRole(token, ['manager', 'admin']);
   var products = findAll('Products', function (p) { return boolFrom(p.track_stock); });
+
+  // ยอดขาย 30 วันล่าสุดต่อสินค้า — อ่าน Orders/OrderItems อย่างละครั้งเดียวแล้วจัดกลุ่มในหน่วยความจำ
+  // (เดิมวนลูปต่อสินค้า แล้วข้างในอ่านทั้งชีต Orders ซ้ำทุกแถวของ OrderItems ที่ตรง product_id อีกที —
+  // กลายเป็นอ่านชีต Orders นับหมื่นครั้งถ้าร้านมีสินค้า/ออเดอร์เยอะ ช้ามากจนรายงานนี้แทบใช้งานไม่ได้)
+  var last30 = addDays(new Date(), -30);
+  var completedRecentOrderIds_ = {};
+  findAll('Orders', function (o) { return o.status === 'completed' && toDate(o.placed_at) >= last30; })
+    .forEach(function (o) { completedRecentOrderIds_[o.order_id] = true; });
+  var soldByProduct_ = {};
+  findAll('OrderItems', function (i) { return completedRecentOrderIds_[i.order_id]; })
+    .forEach(function (i) { soldByProduct_[i.product_id] = (soldByProduct_[i.product_id] || 0) + numFrom(i.qty); });
+
   var totalValue = 0;
   var lowStock = [];
   var rows = products.map(function (p) {
@@ -253,12 +284,7 @@ function adminReportsStock(payload, token) {
     totalValue += value;
     var level = qty <= 0 ? 'out' : (qty <= reorder ? 'low' : 'ok');
     if (level !== 'ok') lowStock.push({ product_id: p.product_id, name: p.name, stock_qty: qty, reorder_point: reorder });
-    var last30 = addDays(new Date(), -30);
-    var soldQty = findAll('OrderItems', function (i) {
-      if (i.product_id !== p.product_id) return false;
-      var ord = findOne('Orders', function (o) { return o.order_id === i.order_id; });
-      return ord && ord.status === 'completed' && toDate(ord.placed_at) >= last30;
-    }).reduce(function (s, i) { return s + numFrom(i.qty); }, 0);
+    var soldQty = soldByProduct_[p.product_id] || 0;
     var turnoverRate = qty > 0 ? round2(soldQty / qty) : (soldQty > 0 ? soldQty : 0);
     return { product_id: p.product_id, name: p.name, stock_qty: qty, reorder_point: reorder, stock_value: value, level: level, sold_last_30d: soldQty, turnover_rate: turnoverRate };
   });
