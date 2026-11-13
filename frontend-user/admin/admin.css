@@ -45,7 +45,14 @@ button, input, select, textarea { font-family: inherit; }
 .kpi-card .sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 24px; }
-.card canvas { display: block; margin: 0 auto; }
+/**
+ * display:block เฉยๆ พอ ห้ามใส่ margin:auto เด็ดขาด — Chart.js (responsive:true) คำนวณความกว้างที่ "ใช้ได้"
+ * ของ canvas จาก (ความกว้าง parent) ลบด้วย (margin ของตัว canvas เอง) ถ้า margin เป็น auto มันจะอ่านค่า
+ * margin ที่ยังไม่อัปเดต (คำนวณจากความกว้าง canvas เริ่มต้น 300px ที่ยังไม่ได้ resize) มาลบออก กลายเป็น
+ * วนลูปตัวเองจนความกว้างล็อกค้างอยู่ที่ ~300px ตลอด (เป็นสาเหตุที่กราฟแคบติดซ้าย/ขวามีที่ว่างเยอะมาก)
+ * ยืนยันด้วยการจำลองแยกต่างหากนอกระบบจริงแล้ว — เอา margin:auto ออกกราฟจะเต็มความกว้าง parent ปกติทันที
+ */
+.card canvas { display: block; }
 /**
  * ความสูงมาตรฐานของกรอบกราฟ (เส้น/แท่งแนวตั้ง) — ปรับตามความกว้างจอด้วย clamp() แทนตัวเลข px ตายตัว
  * ที่ต้องเดาแยกทีละกราฟ (สาเหตุเดิมที่ขนาดกราฟกับกรอบการ์ดไม่สัมพันธ์กัน) — charts.js เป็นคนเติม class
