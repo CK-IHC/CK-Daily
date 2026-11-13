@@ -19,6 +19,13 @@ var Charts = (function () {
     return isNaN(n) ? String(v) : n.toLocaleString('th-TH', { maximumFractionDigits: 2 });
   }
 
+  /** ตัดข้อความแกนยาวๆ (เช่น ชื่อสินค้า) ให้สั้นลงพอแสดงผล — กันป้ายแกนยาวจนเบียด/ทับกราฟหรือป้ายข้างเคียง
+   * บนจอแคบ ชื่อเต็มยังดูได้จาก tooltip ตอนเอาเมาส์ไปชี้ (ไม่กระทบข้อมูลจริงใน chart.data.labels) */
+  function truncateLabel_(s, max) {
+    s = String(s == null ? '' : s);
+    return s.length > max ? s.slice(0, max - 1) + '…' : s;
+  }
+
   /** วาดค่าไว้เหนือแท่ง/จุดของทุกกราฟ (bar แนวตั้ง, bar แนวนอน, line) — ไม่พึ่ง plugin ภายนอกเพิ่มเติมจาก CDN */
   function registerDataLabelPlugin_() {
     if (pluginRegistered || !window.Chart) return;
@@ -157,8 +164,8 @@ var Charts = (function () {
     registerBgPlugin_();
     var opts = baseOptions_({
       scales: {
-        y: { beginAtZero: true, grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false }, ticks: { callback: function (v) { return fmtVal_(v); } } },
-        x: { grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false } }
+        y: { beginAtZero: true, grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false }, ticks: { padding: 8, callback: function (v) { return fmtVal_(v); } } },
+        x: { grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false }, ticks: { padding: 8 } }
       }
     });
     opts.plugins.legend.display = datasets.length > 1;
@@ -179,7 +186,7 @@ var Charts = (function () {
     // แนวนอน (เช่น Top 10 สินค้า) ยิ่งมีแท่งเยอะยิ่งต้องการความสูงมากขึ้นตามสัดส่วน — กันป้ายตัวเลข/ชื่อแท่งทับกัน
     // แนวตั้ง (รายเดือน/รายปี) จำนวนแท่งค่อนข้างคงที่อยู่แล้ว ใช้ความสูงมาตรฐานจาก .chart-wrap (CSS) แทน
     // เรียกทุกครั้งแม้ตอน update (ไม่ใช่แค่สร้างใหม่) เพราะจำนวนแท่งเปลี่ยนได้ระหว่างรีเฟรช
-    lockHeight_(ctx, horizontal ? Math.max(200, labels.length * 44 + 48) : null);
+    lockHeight_(ctx, horizontal ? Math.max(200, labels.length * 48 + 48) : null);
     // existing.canvas !== ctx เกิดตอนออกจากหน้านี้แล้วกลับมาใหม่ (DOM ถูกรื้อสร้างใหม่ id ซ้ำเดิม) ต้องสร้าง
     // Chart ใหม่ผูกกับ canvas element ปัจจุบันเท่านั้น — indexAxis (แนวตั้ง/แนวนอน) เปลี่ยนโครงสร้างสเกล
     // ทั้งหมดก็ต้องสร้างใหม่เช่นกัน อัปเดตแบบ in-place ได้เฉพาะตอน canvas เดิม + แนวเดิมเท่านั้น
@@ -199,11 +206,13 @@ var Charts = (function () {
       layout: { padding: Object.assign({}, PLOT_PADDING_, horizontal ? { right: 44 } : {}) },
       scales: {
         x: horizontal
-          ? { beginAtZero: true, grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false }, ticks: { callback: function (v) { return fmtVal_(v); } } }
-          : { grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false } },
+          ? { beginAtZero: true, grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false }, ticks: { padding: 8, callback: function (v) { return fmtVal_(v); } } }
+          : { grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false }, ticks: { padding: 8 } },
         y: horizontal
-          ? { grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false } }
-          : { beginAtZero: true, grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false }, ticks: { callback: function (v) { return fmtVal_(v); } } }
+          // แกนหมวดหมู่ของกราฟแท่งแนวนอน (เช่น ชื่อสินค้า/ชื่อรอบ) ตัดข้อความยาวให้สั้นลง กันป้ายชื่อยาวๆ
+          // เบียดจนทับกราฟหรือทับแท่งข้างเคียง โดยเฉพาะตอนจอแคบ — ชื่อเต็มยังดูได้จาก tooltip ตอนชี้เมาส์
+          ? { grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false }, ticks: { padding: 8, callback: function (v) { return truncateLabel_(this.getLabelForValue(v), 22); } } }
+          : { beginAtZero: true, grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false }, ticks: { padding: 8, callback: function (v) { return fmtVal_(v); } } }
       }
     });
     opts.plugins.legend.display = datasets.length > 1;

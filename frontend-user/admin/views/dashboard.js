@@ -79,30 +79,36 @@ Views.dashboard = function (container) {
         '<span id="liveUpdatedAt" style="margin-left:auto"></span>' +
       '</div>' +
       '<div class="kpi-grid" id="kpiGrid">' + kpiGridHtml_(d) + '</div>' +
-      '<h3 style="margin:4px 0 12px">ยอดขายรวม</h3>' +
-      '<div class="chart-grid">' +
-        '<div class="card"><div class="card-head"><h3>รายเดือน (Jan-Dec)</h3>' +
-          '<div class="no-print" style="display:flex;gap:6px;align-items:center">' +
-          '<select id="yearSelect" class="form-control" style="width:auto;display:inline-block">' +
-            YEAR_OPTIONS_.map(function (y) { return '<option value="' + y + '"' + (y === selectedYear ? ' selected' : '') + '>ปี ' + y + '</option>'; }).join('') +
-          '</select>' +
-          '<button class="btn btn-outline btn-sm" id="btnPrintMonthly">🖨️</button></div></div>' +
-          // canvas ต้องอยู่ใน wrapper ของตัวเอง แยกจาก .card-head เพราะ Charts.* บังคับความสูงคงที่ที่
-          // "parentElement" ของ canvas เสมอ — ถ้า parent คือ .card ทั้งก้อน หัวการ์ดด้านบนจะถูกบีบ/ตัดไปด้วย
-          '<div id="monthlyChartArea"><canvas id="monthlySalesChart"></canvas></div></div>' +
-        '<div class="card"><div class="card-head"><h3>รายปี (5 ปีล่าสุด)</h3>' +
-          '<button class="btn btn-outline btn-sm no-print" id="btnPrintYearly">🖨️</button></div>' +
-          '<div id="yearlyChartArea"><canvas id="yearlySalesChart"></canvas></div></div>' +
+      '<div class="card-head" style="margin:4px 0 12px"><h3 style="margin:0">ยอดขายรวม</h3>' +
+        '<button class="btn btn-outline btn-sm no-print" id="btnPrintSalesOverview">🖨️ พิมพ์ทั้งหมด</button></div>' +
+      // ห่อทั้ง 3 กราฟ (รายเดือน/รายปี/ตามรอบการขาย) ไว้ใน wrapper เดียว ให้ปุ่ม "พิมพ์ทั้งหมด" ด้านบน
+      // พิมพ์รวมเป็นรายงานเดียวได้ — แต่ละการ์ดยังมีปุ่มพิมพ์เฉพาะของตัวเองไว้ใช้แยกทีละกราฟด้วย
+      '<div id="salesOverviewSection">' +
+        '<div class="chart-grid">' +
+          '<div class="card"><div class="card-head"><h3>รายเดือน (Jan-Dec)</h3>' +
+            '<div class="no-print" style="display:flex;gap:6px;align-items:center">' +
+            '<select id="yearSelect" class="form-control" style="width:auto;display:inline-block">' +
+              YEAR_OPTIONS_.map(function (y) { return '<option value="' + y + '"' + (y === selectedYear ? ' selected' : '') + '>ปี ' + y + '</option>'; }).join('') +
+            '</select>' +
+            '<button class="btn btn-outline btn-sm" id="btnPrintMonthly">🖨️</button></div></div>' +
+            // canvas ต้องอยู่ใน wrapper ของตัวเอง แยกจาก .card-head เพราะ Charts.* บังคับความสูงคงที่ที่
+            // "parentElement" ของ canvas เสมอ — ถ้า parent คือ .card ทั้งก้อน หัวการ์ดด้านบนจะถูกบีบ/ตัดไปด้วย
+            '<div id="monthlyChartArea"><canvas id="monthlySalesChart"></canvas></div></div>' +
+          '<div class="card"><div class="card-head"><h3>รายปี (5 ปีล่าสุด)</h3>' +
+            '<button class="btn btn-outline btn-sm no-print" id="btnPrintYearly">🖨️</button></div>' +
+            '<div id="yearlyChartArea"><canvas id="yearlySalesChart"></canvas></div></div>' +
+        '</div>' +
+        // "ตามรอบการขาย" ย้ายมาอยู่แถวเต็มความกว้างของตัวเอง (แทนที่จะเบียดอยู่ในคอลัมน์แคบๆ ร่วมกับรายเดือน/
+        // รายปี) เพราะแสดงทุกรอบของทั้งปี มีแท่งเยอะกว่าชัดเจน ต้องการพื้นที่กว้างกว่าคอลัมน์ละ 1 ใน 3
+        '<div class="card"><div class="card-head"><h3 id="roundChartTitle">ตามรอบการขาย — ปี ' + selectedYear + '</h3>' +
+          '<button class="btn btn-outline btn-sm no-print" id="btnPrintRoundSales">🖨️</button></div>' +
+          '<div id="roundSalesChartArea"><canvas id="roundSalesChart"></canvas></div></div>' +
       '</div>' +
-      // "ตามรอบการขาย" ย้ายมาอยู่แถวเต็มความกว้างของตัวเอง (แทนที่จะเบียดอยู่ในคอลัมน์แคบๆ ร่วมกับรายเดือน/
-      // รายปี) เพราะแสดงทุกรอบของทั้งปี มีแท่งเยอะกว่าชัดเจน ต้องการพื้นที่กว้างกว่าคอลัมน์ละ 1 ใน 3
-      '<div class="card"><div class="card-head"><h3 id="roundChartTitle">ตามรอบการขาย — ปี ' + selectedYear + '</h3>' +
-        '<button class="btn btn-outline btn-sm no-print" id="btnPrintRoundSales">🖨️</button></div>' +
-        '<div id="roundSalesChartArea"><canvas id="roundSalesChart"></canvas></div></div>' +
       '<div class="card"><h3 id="itemChartTitle">ยอดขายแยกรายสินค้า (Top 10) — ปี ' + selectedYear + '</h3><div id="itemChartArea"><canvas id="itemChart"></canvas></div></div>' +
       '<div class="card"><h3>ยอดขายแยกรายรอบ</h3><div id="roundSalesArea">' + UI.loading() + '</div></div>' +
       '<div class="card"><div class="card-head"><h3>ออเดอร์ที่ต้องดำเนินการ</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintAction">🖨️ พิมพ์</button></div><div id="actionOrders">' + UI.loading() + '</div></div>';
 
+    document.getElementById('btnPrintSalesOverview').onclick = function () { UI.printWithHeader('สรุปยอดขายรวม', document.getElementById('salesOverviewSection')); };
     document.getElementById('btnPrintRoundSales').onclick = function (e) { UI.printWithHeader('ยอดขายตามรอบการขาย', e.currentTarget.closest('.card')); };
     document.getElementById('btnPrintMonthly').onclick = function (e) { UI.printWithHeader('ยอดขายรายเดือน', e.currentTarget.closest('.card')); };
     document.getElementById('btnPrintYearly').onclick = function (e) { UI.printWithHeader('ยอดขายรายปี', e.currentTarget.closest('.card')); };
