@@ -173,7 +173,15 @@ Views.dashboard = function (container) {
       if (!rows.length) { area.innerHTML = '<div class="empty-state">ยังไม่มีรอบการขายใน 90 วันล่าสุด</div>'; return; }
       // เรียงตามเวลาเปิดรอบจริง (backend คืนมาเรียงตามยอดขายมาก-น้อย) แล้วนับ "รอบที่ N" แยกตามเดือนที่เปิดรอบ
       // เช่น เดือนนี้เปิด 3 รอบ ก็จะได้ป้าย "OCT 2026 / รอบที่ 1, 2, 3" ไล่ตามลำดับเวลาในเดือนนั้น
-      var sorted = rows.slice().sort(function (a, b) { return new Date(a.open_at) - new Date(b.open_at); });
+      // กรองแถวที่ไม่มี open_at (หรือ parse เป็นวันที่ไม่ได้) ทิ้งก่อน — เกิดได้ถ้า backend ที่ deploy อยู่
+      // ยังเป็นเวอร์ชันเก่าก่อนเพิ่มฟิลด์นี้ กันหน้าแอดมินพังทั้งกราฟเพราะข้อมูลแค่บางแถวไม่ครบ
+      var sorted = rows.slice()
+        .filter(function (r) { return r.open_at && !isNaN(new Date(r.open_at).getTime()); })
+        .sort(function (a, b) { return new Date(a.open_at) - new Date(b.open_at); });
+      if (!sorted.length) {
+        area.innerHTML = '<div class="empty-state">ไม่มีข้อมูลวันที่เปิดรอบ — ตรวจสอบว่าอัปโหลด backend/ReportService.gs เวอร์ชันล่าสุดและ Deploy ใหม่แล้วหรือยัง</div>';
+        return;
+      }
       var countInMonth = {};
       var labels = sorted.map(function (r) {
         var d = new Date(r.open_at);
