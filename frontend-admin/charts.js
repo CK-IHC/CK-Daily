@@ -29,7 +29,7 @@ var Charts = (function () {
         var ctx = chart.ctx;
         var horizontal = chart.options && chart.options.indexAxis === 'y';
         ctx.save();
-        ctx.font = 'bold 11px "Sarabun", sans-serif';
+        ctx.font = 'bold 12px "Sarabun", sans-serif';
         ctx.fillStyle = '#1f2937';
         chart.data.datasets.forEach(function (dataset, di) {
           var meta = chart.getDatasetMeta(di);
@@ -129,13 +129,32 @@ var Charts = (function () {
     }, extra);
   }
 
+  function lineDatasets_(datasets) {
+    return datasets.map(function (d, i) { return Object.assign({ borderColor: PALETTE[i % PALETTE.length], backgroundColor: PALETTE[i % PALETTE.length] + '22', borderWidth: 2, pointRadius: 3, pointBackgroundColor: PALETTE[i % PALETTE.length], tension: .3, fill: true }, d); });
+  }
+
+  /**
+   * รีเฟรชอัตโนมัติทุก 30 วินาที (Dashboard/Live Dashboard) เรียกฟังก์ชันนี้ซ้ำด้วย canvasId เดิมตลอด —
+   * ถ้ากราฟประเภทเดิมมีอยู่แล้ว อัปเดตข้อมูลแล้วเรียก .update() แทนการ destroy+สร้างใหม่ทุกครั้ง
+   * (ทำลาย instance เดิม, parse ตัวเลือกใหม่ทั้งหมด, รีเซ็ต animation) เร็วขึ้นและไม่กระพริบ
+   */
   function line(canvasId, labels, datasets) {
-    destroy(canvasId);
     var ctx = document.getElementById(canvasId);
     if (!ctx || !window.Chart) return;
+    lockHeight_(ctx);
+    // existing.canvas !== ctx เกิดตอนออกจากหน้านี้แล้วกลับมาใหม่ (DOM ถูกรื้อสร้างใหม่ id ซ้ำเดิม) ต้อง
+    // สร้าง Chart ใหม่ผูกกับ canvas element ปัจจุบันเท่านั้น .update() กับของเก่าที่หลุดจาก DOM ไปแล้วไม่ได้
+    var existing = instances[canvasId];
+    if (existing && existing.config.type === 'line' && existing.canvas === ctx) {
+      existing.data.labels = labels;
+      existing.data.datasets = lineDatasets_(datasets);
+      existing.options.plugins.legend.display = datasets.length > 1;
+      existing.update();
+      return;
+    }
+    destroy(canvasId);
     registerDataLabelPlugin_();
     registerBgPlugin_();
-    lockHeight_(ctx);
     var opts = baseOptions_({
       scales: {
         y: { beginAtZero: true, grid: { color: GRID_COLOR_, drawTicks: false }, border: { display: false }, ticks: { callback: function (v) { return fmtVal_(v); } } },
@@ -145,20 +164,36 @@ var Charts = (function () {
     opts.plugins.legend.display = datasets.length > 1;
     instances[canvasId] = new Chart(ctx, {
       type: 'line',
-      data: { labels: labels, datasets: datasets.map(function (d, i) { return Object.assign({ borderColor: PALETTE[i % PALETTE.length], backgroundColor: PALETTE[i % PALETTE.length] + '22', borderWidth: 2, pointRadius: 3, pointBackgroundColor: PALETTE[i % PALETTE.length], tension: .3, fill: true }, d); }) },
+      data: { labels: labels, datasets: lineDatasets_(datasets) },
       options: opts
     });
   }
 
+  function barDatasets_(datasets) {
+    return datasets.map(function (d, i) { return Object.assign({ backgroundColor: PALETTE[i % PALETTE.length], borderRadius: 4, maxBarThickness: 48 }, d); });
+  }
+
   function bar(canvasId, labels, datasets, horizontal) {
-    destroy(canvasId);
     var ctx = document.getElementById(canvasId);
     if (!ctx || !window.Chart) return;
-    registerDataLabelPlugin_();
-    registerBgPlugin_();
     // แนวนอน (เช่น Top 10 สินค้า) ยิ่งมีแท่งเยอะยิ่งต้องการความสูงมากขึ้นตามสัดส่วน — กันป้ายตัวเลข/ชื่อแท่งทับกัน
     // แนวตั้ง (รายเดือน/รายปี) จำนวนแท่งค่อนข้างคงที่อยู่แล้ว ใช้ความสูงมาตรฐานจาก .chart-wrap (CSS) แทน
-    lockHeight_(ctx, horizontal ? Math.max(160, labels.length * 36 + 40) : null);
+    // เรียกทุกครั้งแม้ตอน update (ไม่ใช่แค่สร้างใหม่) เพราะจำนวนแท่งเปลี่ยนได้ระหว่างรีเฟรช
+    lockHeight_(ctx, horizontal ? Math.max(200, labels.length * 44 + 48) : null);
+    // existing.canvas !== ctx เกิดตอนออกจากหน้านี้แล้วกลับมาใหม่ (DOM ถูกรื้อสร้างใหม่ id ซ้ำเดิม) ต้องสร้าง
+    // Chart ใหม่ผูกกับ canvas element ปัจจุบันเท่านั้น — indexAxis (แนวตั้ง/แนวนอน) เปลี่ยนโครงสร้างสเกล
+    // ทั้งหมดก็ต้องสร้างใหม่เช่นกัน อัปเดตแบบ in-place ได้เฉพาะตอน canvas เดิม + แนวเดิมเท่านั้น
+    var existing = instances[canvasId];
+    if (existing && existing.config.type === 'bar' && existing.canvas === ctx && existing.options.indexAxis === (horizontal ? 'y' : 'x')) {
+      existing.data.labels = labels;
+      existing.data.datasets = barDatasets_(datasets);
+      existing.options.plugins.legend.display = datasets.length > 1;
+      existing.update();
+      return;
+    }
+    destroy(canvasId);
+    registerDataLabelPlugin_();
+    registerBgPlugin_();
     var opts = baseOptions_({
       indexAxis: horizontal ? 'y' : 'x',
       layout: { padding: Object.assign({}, PLOT_PADDING_, horizontal ? { right: 44 } : {}) },
@@ -174,7 +209,7 @@ var Charts = (function () {
     opts.plugins.legend.display = datasets.length > 1;
     instances[canvasId] = new Chart(ctx, {
       type: 'bar',
-      data: { labels: labels, datasets: datasets.map(function (d, i) { return Object.assign({ backgroundColor: PALETTE[i % PALETTE.length], borderRadius: 4, maxBarThickness: 48 }, d); }) },
+      data: { labels: labels, datasets: barDatasets_(datasets) },
       options: opts
     });
   }
