@@ -1,5 +1,5 @@
 /**
- * views/dashboard.js — KPI สรุป + กราฟยอดขาย (วัน/เดือน/ปี) + กราฟรายสินค้า + ยอดขายรายรอบ + ออเดอร์ที่ต้องจัดการ
+ * views/dashboard.js — KPI สรุป + กราฟยอดขาย (สัปดาห์/เดือน/ปี แยก 3 การ์ด) + กราฟรายสินค้า + ยอดขายรายรอบ + ออเดอร์ที่ต้องจัดการ
  * รีเฟรชข้อมูลอัตโนมัติทุก 30 วินาที (ไม่รื้อ DOM ทั้งหน้า กันตัวกรองที่เลือกไว้รีเซ็ต) ให้ความรู้สึกเป็น live dashboard
  */
 var DASHBOARD_REFRESH_MS_ = 30000;
@@ -33,13 +33,9 @@ function bindOrdersTableActions_(container, onChange) {
 Views.dashboard = function (container) {
   container.innerHTML = UI.loading();
   var canView = State.can('dashboard:view');
-  var groupBy = 'day';
   var selectedYear = new Date().getFullYear();
   var YEAR_OPTIONS_ = [0, 1, 2, 3, 4].map(function (i) { return selectedYear - i; });
   var refreshTimer = null;
-  var salesRoundId = '';
-  var salesDateFrom = '', salesDateTo = '';
-  var rounds_ = [];
 
   if (!canView) {
     Api.call('admin.orders.list', { status: 'pending', page_size: 10 }).then(function (data) {
@@ -83,39 +79,33 @@ Views.dashboard = function (container) {
         '<span id="liveUpdatedAt" style="margin-left:auto"></span>' +
       '</div>' +
       '<div class="kpi-grid" id="kpiGrid">' + kpiGridHtml_(d) + '</div>' +
-      '<div class="card"><div class="card-head" style="flex-wrap:wrap;gap:8px"><h3>ยอดขายรวม</h3>' +
-        '<div class="no-print" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">' +
-        '<select id="groupBySelect" class="form-control" style="width:auto;display:inline-block">' +
-          '<option value="day">รายวัน (30 วันล่าสุด)</option><option value="week">รายสัปดาห์</option><option value="month">รายเดือน (Jan-Dec)</option><option value="year">รายปี</option>' +
-        '</select>' +
-        '<select id="yearSelect" class="form-control" style="width:auto;display:inline-block">' +
-          YEAR_OPTIONS_.map(function (y) { return '<option value="' + y + '"' + (y === selectedYear ? ' selected' : '') + '>ปี ' + y + '</option>'; }).join('') +
-        '</select>' +
-        '<select id="salesRoundSelect" class="form-control" style="width:auto;display:inline-block"><option value="">ทุกรอบ</option></select>' +
-        '<label style="font-size:12px;color:var(--text-muted)">จาก <input id="salesDateFrom" type="date" class="form-control"></label>' +
-        '<label style="font-size:12px;color:var(--text-muted)">ถึง <input id="salesDateTo" type="date" class="form-control"></label>' +
-        '<button id="btnPrintSales" class="btn btn-outline btn-sm">🖨️ พิมพ์</button></div></div>' +
-        // canvas ต้องอยู่ใน wrapper ของตัวเอง แยกจาก .card-head (ตัวกรองด้านบน) เพราะ Charts.* บังคับความสูง
-        // คงที่ที่ "parentElement" ของ canvas เสมอ — ถ้า parent คือ .card ทั้งก้อน แถบตัวกรองด้านบนจะถูกบีบ/ตัด
-        // ไปด้วย (เป็นสาเหตุที่กราฟกับกรอบการ์ดทับกัน)
-        '<div id="salesChartArea"><canvas id="salesChart"></canvas></div></div>' +
+      '<h3 style="margin:4px 0 12px">ยอดขายรวม</h3>' +
+      '<div class="chart-grid">' +
+        '<div class="card"><div class="card-head"><h3>รายสัปดาห์ (90 วันล่าสุด)</h3>' +
+          '<button class="btn btn-outline btn-sm no-print" id="btnPrintWeekly">🖨️</button></div>' +
+          // canvas ต้องอยู่ใน wrapper ของตัวเอง แยกจาก .card-head เพราะ Charts.* บังคับความสูงคงที่ที่
+          // "parentElement" ของ canvas เสมอ — ถ้า parent คือ .card ทั้งก้อน หัวการ์ดด้านบนจะถูกบีบ/ตัดไปด้วย
+          '<div id="weeklyChartArea"><canvas id="weeklySalesChart"></canvas></div></div>' +
+        '<div class="card"><div class="card-head"><h3>รายเดือน (Jan-Dec)</h3>' +
+          '<div class="no-print" style="display:flex;gap:6px;align-items:center">' +
+          '<select id="yearSelect" class="form-control" style="width:auto;display:inline-block">' +
+            YEAR_OPTIONS_.map(function (y) { return '<option value="' + y + '"' + (y === selectedYear ? ' selected' : '') + '>ปี ' + y + '</option>'; }).join('') +
+          '</select>' +
+          '<button class="btn btn-outline btn-sm" id="btnPrintMonthly">🖨️</button></div></div>' +
+          '<div id="monthlyChartArea"><canvas id="monthlySalesChart"></canvas></div></div>' +
+        '<div class="card"><div class="card-head"><h3>รายปี (5 ปีล่าสุด)</h3>' +
+          '<button class="btn btn-outline btn-sm no-print" id="btnPrintYearly">🖨️</button></div>' +
+          '<div id="yearlyChartArea"><canvas id="yearlySalesChart"></canvas></div></div>' +
+      '</div>' +
       '<div class="card"><h3 id="itemChartTitle">ยอดขายแยกรายสินค้า (Top 10) — ปี ' + selectedYear + '</h3><div id="itemChartArea"><canvas id="itemChart"></canvas></div></div>' +
       '<div class="card"><h3>ยอดขายแยกรายรอบ</h3><div id="roundSalesArea">' + UI.loading() + '</div></div>' +
       '<div class="card"><div class="card-head"><h3>ออเดอร์ที่ต้องดำเนินการ</h3><button class="btn btn-outline btn-sm no-print" id="btnPrintAction">🖨️ พิมพ์</button></div><div id="actionOrders">' + UI.loading() + '</div></div>';
 
-    document.getElementById('btnPrintSales').onclick = function (e) { UI.printWithHeader('สรุปยอดขาย Dashboard', e.currentTarget.closest('.card')); };
+    document.getElementById('btnPrintWeekly').onclick = function (e) { UI.printWithHeader('ยอดขายรายสัปดาห์', e.currentTarget.closest('.card')); };
+    document.getElementById('btnPrintMonthly').onclick = function (e) { UI.printWithHeader('ยอดขายรายเดือน', e.currentTarget.closest('.card')); };
+    document.getElementById('btnPrintYearly').onclick = function (e) { UI.printWithHeader('ยอดขายรายปี', e.currentTarget.closest('.card')); };
     document.getElementById('btnPrintAction').onclick = function (e) { UI.printWithHeader('ออเดอร์ที่ต้องดำเนินการ', e.currentTarget.closest('.card')); };
-    document.getElementById('groupBySelect').onchange = function (e) { groupBy = e.target.value; loadSalesChart(); };
-    document.getElementById('yearSelect').onchange = function (e) { selectedYear = Number(e.target.value); loadSalesChart(); loadTopProducts(); };
-    document.getElementById('salesRoundSelect').onchange = function (e) { salesRoundId = e.target.value; loadSalesChart(); };
-    document.getElementById('salesDateFrom').onchange = function (e) { salesDateFrom = e.target.value; loadSalesChart(); };
-    document.getElementById('salesDateTo').onchange = function (e) { salesDateTo = e.target.value; loadSalesChart(); };
-    Api.call('admin.rounds.list').then(function (data) {
-      rounds_ = data;
-      var sel = document.getElementById('salesRoundSelect');
-      if (!sel) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อนตอบกลับ
-      sel.insertAdjacentHTML('beforeend', rounds_.map(function (r) { return '<option value="' + r.round_id + '">' + UI.escapeHtml(r.round_name) + '</option>'; }).join(''));
-    }).catch(function () {});
+    document.getElementById('yearSelect').onchange = function (e) { selectedYear = Number(e.target.value); loadMonthlySalesChart(); loadTopProducts(); };
 
     loadAll_();
     touchLiveDot_();
@@ -126,7 +116,9 @@ Views.dashboard = function (container) {
         var grid = document.getElementById('kpiGrid');
         if (grid) grid.innerHTML = kpiGridHtml_(data);
       }).catch(function () {});
-      loadSalesChart();
+      loadWeeklySalesChart();
+      loadMonthlySalesChart();
+      loadYearlySalesChart();
       loadTopProducts();
       loadRoundSales();
       loadActionOrders();
@@ -171,32 +163,31 @@ Views.dashboard = function (container) {
 
   var MONTH_ABBR_ = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
-  function loadSalesChart() {
-    var payload = { group_by: groupBy };
-    // ค่าเริ่มต้นตามช่วงเวลาที่เลือก (ถ้าไม่ได้ระบุ date from/to เองด้านล่าง) — เดิม groupBy==='day' ไม่ได้ตั้ง
-    // date_from เลย ทำให้ backend fallback เหลือแค่ 7 วันล่าสุด ทั้งที่ label บอกว่า "30 วันล่าสุด" (บั๊ก แก้แล้ว)
-    if (groupBy === 'day') payload.date_from = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
-    else if (groupBy === 'month') { payload.date_from = selectedYear + '-01-01'; payload.date_to = selectedYear + '-12-31'; }
-    else if (groupBy === 'week') payload.date_from = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
-    else if (groupBy === 'year') payload.date_from = new Date(new Date().getFullYear() - 4, 0, 1).toISOString().slice(0, 10);
-    // ตัวกรอง date from/to เอง (ถ้าตั้งไว้) ทับค่าเริ่มต้นตาม groupBy เสมอ
-    if (salesDateFrom) payload.date_from = salesDateFrom;
-    if (salesDateTo) payload.date_to = salesDateTo;
-    if (salesRoundId) payload.round_id = salesRoundId;
+  // "ยอดขายรวม" แยกเป็น 3 กราฟแยกการ์ดกัน แสดงพร้อมกันตลอด แทนการ์ดเดียวที่ต้องสลับดูทีละช่วงเวลาแบบเดิม
+  // รายสัปดาห์ = กราฟเส้นดูแนวโน้ม / รายเดือน-รายปี = หมวดหมู่ไม่ต่อเนื่อง เทียบกันชัดเจนกว่าด้วยกราฟแท่ง
+  function loadWeeklySalesChart() {
+    var payload = { group_by: 'week', date_from: new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10) };
     Api.call('admin.reports.salesByTime', payload).then(function (r) {
-      if (!document.getElementById('salesChart')) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อน refresh รอบถัดไปจะทำงาน
-      var labels = r.series.map(function (s) {
-        if (groupBy === 'month') { var m = Number(s.period.slice(5, 7)); return MONTH_ABBR_[m - 1] || s.period; }
-        return s.period;
-      });
-      var series = r.series.map(function (s) { return s.sales; });
-      // รายเดือน/รายปี = หมวดหมู่ไม่ต่อเนื่อง เทียบกันชัดเจนกว่าด้วยกราฟแท่ง — รายวัน/รายสัปดาห์ยังคงเป็นกราฟเส้นแสดงแนวโน้ม
-      if (groupBy === 'month' || groupBy === 'year') {
-        Charts.bar('salesChart', labels, [{ label: 'ยอดขาย', data: series }]);
-      } else {
-        Charts.line('salesChart', labels, [{ label: 'ยอดขาย', data: series }]);
-      }
-    }).catch(function (err) { UI.toast('โหลดกราฟยอดขายไม่สำเร็จ: ' + err.message, 'error'); });
+      if (!document.getElementById('weeklySalesChart')) return; // ผู้ใช้เปลี่ยนหน้าไปแล้วก่อน refresh รอบถัดไปจะทำงาน
+      Charts.line('weeklySalesChart', r.series.map(function (s) { return s.period; }), [{ label: 'ยอดขาย', data: r.series.map(function (s) { return s.sales; }) }]);
+    }).catch(function (err) { UI.toast('โหลดกราฟยอดขายรายสัปดาห์ไม่สำเร็จ: ' + err.message, 'error'); });
+  }
+
+  function loadMonthlySalesChart() {
+    var payload = { group_by: 'month', date_from: selectedYear + '-01-01', date_to: selectedYear + '-12-31' };
+    Api.call('admin.reports.salesByTime', payload).then(function (r) {
+      if (!document.getElementById('monthlySalesChart')) return;
+      var labels = r.series.map(function (s) { var m = Number(s.period.slice(5, 7)); return MONTH_ABBR_[m - 1] || s.period; });
+      Charts.bar('monthlySalesChart', labels, [{ label: 'ยอดขาย', data: r.series.map(function (s) { return s.sales; }) }]);
+    }).catch(function (err) { UI.toast('โหลดกราฟยอดขายรายเดือนไม่สำเร็จ: ' + err.message, 'error'); });
+  }
+
+  function loadYearlySalesChart() {
+    var payload = { group_by: 'year', date_from: new Date(new Date().getFullYear() - 4, 0, 1).toISOString().slice(0, 10) };
+    Api.call('admin.reports.salesByTime', payload).then(function (r) {
+      if (!document.getElementById('yearlySalesChart')) return;
+      Charts.bar('yearlySalesChart', r.series.map(function (s) { return s.period; }), [{ label: 'ยอดขาย', data: r.series.map(function (s) { return s.sales; }) }]);
+    }).catch(function (err) { UI.toast('โหลดกราฟยอดขายรายปีไม่สำเร็จ: ' + err.message, 'error'); });
   }
 
   return function cleanup() { if (refreshTimer) clearInterval(refreshTimer); };
